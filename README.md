@@ -30,8 +30,10 @@ current address and explains that interactive UI is required. Pi stores only
 Both adapters expose `kepos_image_generate`. Omit `images` to generate a PNG.
 For an edit, pass one through five PNG, JPEG, GIF, or WebP paths relative to the
 active DSH workspace or Pi current working directory. Paths outside that
-directory, including symlink escapes, are rejected. Results are native DSH
-attachments or Pi image content blocks; no output file is written.
+directory, including symlink escapes, are rejected. DSH also saves each result
+as a PNG under `.dsh/kepos-imagegen/` and returns that relative path alongside
+its native attachment. Pi returns an image content block and does not write an
+output file.
 
 ## Maintainer release setup
 
