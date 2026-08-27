@@ -13,10 +13,14 @@ import {
 import type { ImageAttachmentRef } from "@deepseek-ai/dsh-attachment";
 import z from "@deepseek-ai/schemastery";
 import { defineTool, type ToolDefinition } from "@deepseek-ai/dsh-tools";
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
 export const name = "lamplitisles-kepos-imagegen";
 export const inject = ["attachments", "fs", "settings", "tools"] as const;
 export const SETTINGS_NAMESPACE = "lamplitisles-kepos-imagegen";
+export const GENERATED_IMAGES_DIRECTORY = ".dsh/kepos-imagegen";
 
 export const SettingsSchema = z.object({
   bridgeUrl: z.string().default(DEFAULT_BRIDGE_URL).loose(),
@@ -41,6 +45,7 @@ export interface DshFileSystem {
     signal: AbortSignal | undefined,
     maxBytes: number,
   ): Promise<Uint8Array>;
+  processPath(target: DshTarget): string;
 }
 
 export interface DshAttachments {
@@ -71,10 +76,18 @@ export interface DshPluginServices {
   fs: DshFileSystem;
   getBridgeUrl(): string;
   fetch: typeof globalThis.fetch;
+  writeGeneratedImage(
+    path: string,
+    data: Uint8Array,
+    fs: DshFileSystem,
+    cwd: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
 }
 
 export interface DshToolResult {
   attachment: DshPngAttachment;
+  path: string;
   message: string;
 }
 
@@ -149,6 +162,7 @@ export function apply(ctx: DshContext): void {
             additionalProperties: false,
             required: true,
           },
+          path: { type: "string", required: true },
           message: { type: "string", required: true },
         },
         additionalProperties: false,
@@ -166,6 +180,7 @@ export function apply(ctx: DshContext): void {
         fs: ctx.fs,
         getBridgeUrl: () => validOrDefault(scope.get().bridgeUrl),
         fetch: globalThis.fetch,
+        writeGeneratedImage,
       });
     },
   });
@@ -179,6 +194,7 @@ export async function generateWithDsh(
 ): Promise<DshToolResult> {
   try {
     const { prompt, images } = parseArgs(args);
+    const cwd = workspaceCwd(exec);
     const sourceUrls = images
       ? await readDshSources(
           images,
@@ -196,6 +212,14 @@ export async function generateWithDsh(
     if (sourceUrls !== undefined) request.images = sourceUrls;
     if (exec.signal !== undefined) request.signal = exec.signal;
     const result = await requestImage(request);
+    const path = generatedImagePath();
+    await services.writeGeneratedImage(
+      path,
+      result.data,
+      services.fs,
+      cwd,
+      exec.signal,
+    );
     const attachment = asPngAttachment(
       await services.attachments.saveImage({
         data: result.data,
@@ -203,10 +227,37 @@ export async function generateWithDsh(
         name: "kepos-image.png",
       }),
     );
-    return { attachment, message: "Generated image." };
+    return { attachment, path, message: `Generated image saved to ${path}.` };
   } catch (error) {
     throw safeDshError(error);
   }
+}
+
+function generatedImagePath(): string {
+  return `${GENERATED_IMAGES_DIRECTORY}/${randomUUID()}.png`;
+}
+
+export async function writeGeneratedImage(
+  path: string,
+  data: Uint8Array,
+  fs: DshFileSystem,
+  cwd: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const target = await fs.resolve(path, { cwd, signal });
+  const processPath = fs.processPath(target);
+  await mkdir(dirname(processPath), { recursive: true });
+  await writeFile(processPath, data, { signal });
+}
+
+function workspaceCwd(exec: DshExecution): string {
+  const cwd = exec.agent?.session?.header?.cwd;
+  if (!cwd) {
+    throw new ImagegenError(
+      "Image generation requires an active workspace to save the result.",
+    );
+  }
+  return cwd;
 }
 
 function asPngAttachment(attachment: ImageAttachmentRef): DshPngAttachment {
