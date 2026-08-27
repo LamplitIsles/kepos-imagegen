@@ -6,6 +6,7 @@ import { releaseCheck } from "../../../scripts/release-check.js";
 import {
   npmDistTag,
   packedFilePaths,
+  packedManifest,
   versionFromTag,
 } from "../../../scripts/release-shared.js";
 import { synchronizeReleaseVersions } from "../../../scripts/sync-release-version.js";
@@ -51,13 +52,18 @@ afterEach(async () => {
 
 describe("release invariants", () => {
   it("reads npm 12 packed-manifest output", () => {
-    const files = packedFilePaths({
+    const packed = {
       "@lamplitisles/dsh-imagegen": {
+        filename: "lamplitisles-dsh-imagegen-0.1.0.tgz",
         files: [{ path: "dist/index.js" }, { path: "cordis.patch.yml" }],
       },
-    } as unknown as Parameters<typeof packedFilePaths>[0]);
+    } as unknown as Parameters<typeof packedFilePaths>[0];
+    const files = packedFilePaths(packed);
 
     expect(files).toEqual(new Set(["dist/index.js", "cordis.patch.yml"]));
+    expect(packedManifest(packed)?.filename).toBe(
+      "lamplitisles-dsh-imagegen-0.1.0.tgz",
+    );
   });
 
   it("accepts matching stable and prerelease tags and chooses their npm channels", async () => {

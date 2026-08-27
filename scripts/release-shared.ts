@@ -43,13 +43,20 @@ export function readJson(path: string): Record<string, unknown> {
 }
 
 type PackedPackage = {
+  filename?: string;
   files?: Array<{ path?: string }>;
 };
 
 export type PackedManifest = PackedPackage[] | Record<string, PackedPackage>;
 
+export function packedManifest(
+  packed: PackedManifest,
+): PackedPackage | undefined {
+  return Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
+}
+
 export function packedFilePaths(packed: PackedManifest): Set<string> {
-  const manifest = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
+  const manifest = packedManifest(packed);
   const paths = manifest?.files?.flatMap((file) =>
     file.path === undefined ? [] : [file.path],
   );

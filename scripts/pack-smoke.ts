@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { packedManifest, type PackedManifest } from "./release-shared.js";
 
 const root = resolve(import.meta.dirname, "..");
 const temporaryDirectories: string[] = [];
@@ -35,8 +36,9 @@ function pack(packageDirectory: string, destination: string): string {
     ["pack", "--json", "--pack-destination", destination],
     packageDirectory,
   );
-  const filename = (JSON.parse(output) as Array<{ filename: string }>)[0]
-    ?.filename;
+  const filename = packedManifest(
+    JSON.parse(output) as PackedManifest,
+  )?.filename;
   requireCondition(
     typeof filename === "string",
     "Package manager did not return a tarball name.",
