@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { releaseCheck } from "../../../scripts/release-check.js";
-import { npmDistTag, versionFromTag } from "../../../scripts/release-shared.js";
+import {
+  npmDistTag,
+  packedFilePaths,
+  versionFromTag,
+} from "../../../scripts/release-shared.js";
 import { synchronizeReleaseVersions } from "../../../scripts/sync-release-version.js";
 
 const fixtures: string[] = [];
@@ -46,6 +50,16 @@ afterEach(async () => {
 });
 
 describe("release invariants", () => {
+  it("reads npm 12 packed-manifest output", () => {
+    const files = packedFilePaths({
+      "@lamplitisles/dsh-imagegen": {
+        files: [{ path: "dist/index.js" }, { path: "cordis.patch.yml" }],
+      },
+    } as unknown as Parameters<typeof packedFilePaths>[0]);
+
+    expect(files).toEqual(new Set(["dist/index.js", "cordis.patch.yml"]));
+  });
+
   it("accepts matching stable and prerelease tags and chooses their npm channels", async () => {
     const root = await fixture();
     expect(releaseCheck(root, "v0.1.0", false)).toEqual([]);
