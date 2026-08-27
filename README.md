@@ -7,7 +7,7 @@ for, stores, or forwards an API key, cookie, token, or other credential.
 ## Install for DSH
 
 ```sh
-dsh plugin --profile <profile> add @kepos/imagegen
+dsh plugin --profile <profile> add @kepos/dsh-imagegen
 ```
 
 Open DSH Settings and select **Kepos Image Generation** to view or change the
@@ -39,7 +39,7 @@ The GitHub workflow publishes a matching tagged release of the two public
 packages. Before the first beta publication, a maintainer must:
 
 1. Create the `@kepos` npm scope and manually publish the initial beta for both
-   `@kepos/imagegen` and `@kepos/pi-imagegen`.
+   `@kepos/dsh-imagegen` and `@kepos/pi-imagegen`.
 2. Configure npm Trusted Publishing for each package identity, this repository,
    the `.github/workflows/release.yml` workflow, and the protected `npm`
    environment.

@@ -5,7 +5,7 @@ import { join } from "node:path";
 export const PUBLIC_PACKAGES = [
   {
     directory: "imagegen",
-    name: "@kepos/imagegen",
+    name: "@kepos/dsh-imagegen",
     requiredFiles: [
       "dist/index.js",
       "dist/index.d.ts",

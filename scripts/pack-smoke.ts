@@ -55,6 +55,10 @@ async function smokeDsh(): Promise<void> {
   ) as Record<string, any>;
 
   requireCondition(
+    manifest.name === "@kepos/dsh-imagegen",
+    "DSH package name is incorrect.",
+  );
+  requireCondition(
     existsSync(join(packageDirectory, "dist/index.js")),
     "DSH host entry is missing from the packed artifact.",
   );
