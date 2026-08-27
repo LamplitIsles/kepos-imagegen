@@ -2,6 +2,10 @@ import {
   DEFAULT_BRIDGE_URL,
   MAX_BRIDGE_JSON_BYTES,
 } from "@kepos/imagegen-core";
+import {
+  assertSupportedJsonSchema,
+  validateJsonSchemaValue,
+} from "@deepseek-ai/dsh-tools";
 import { describe, expect, it } from "vitest";
 import {
   SETTINGS_NAMESPACE,
@@ -12,7 +16,11 @@ import {
   type DshAttachments,
   type DshFileSystem,
 } from "../src/index.js";
-import { decodeSettings, saveBridgeUrl } from "../src/client.js";
+import {
+  bridgeUrlFromSnapshot,
+  decodeSettings,
+  saveBridgeUrl,
+} from "../src/client.js";
 
 const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
 
@@ -68,7 +76,10 @@ function fakeAttachments(): DshAttachments & {
         attachmentId: "result",
         mediaType: input.mediaType,
         bytes: input.data.byteLength,
-      };
+        width: 1,
+        height: 1,
+        ...(input.name === undefined ? {} : { name: input.name }),
+      } as Awaited<ReturnType<DshAttachments["saveImage"]>>;
       saved.push(attachment);
       return attachment;
     },
@@ -121,6 +132,9 @@ describe("DSH image adapter", () => {
         attachmentId: "result",
         mediaType: "image/png",
         bytes: png.byteLength,
+        width: 1,
+        height: 1,
+        name: "kepos-image.png",
       },
       message: "Generated image.",
     });
@@ -157,6 +171,9 @@ describe("DSH image adapter", () => {
         services,
       ),
     ).rejects.toThrow("between one and five");
+    await expect(
+      generateWithDsh({ prompt: "   " }, {}, services),
+    ).rejects.toThrow("nonblank");
   });
 
   it("fails source boundary violations without exposing host paths", async () => {
@@ -222,7 +239,7 @@ describe("DSH image adapter", () => {
     expect(fs.limits).toEqual([]);
   });
 
-  it("registers one sequential tool with a native attachment renderer and safe settings fallback", async () => {
+  it("registers a closed DSH schema with a supported native attachment result", async () => {
     let tool: any;
     const context = {
       attachments: fakeAttachments(),
@@ -242,20 +259,95 @@ describe("DSH image adapter", () => {
     apply(context);
     expect(inject).toEqual(["attachments", "fs", "settings", "tools"]);
     expect(tool.name).toBe("kepos_image_generate");
+    assertSupportedJsonSchema(tool.parameters);
+    assertSupportedJsonSchema(tool.output.schema);
+    expect(tool.parameters).toEqual({
+      type: "object",
+      properties: {
+        prompt: {
+          type: "string",
+          description: "Required nonblank image-generation prompt.",
+        },
+        images: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional one to five nonblank paths relative to the active workspace.",
+        },
+      },
+      required: ["prompt"],
+      additionalProperties: false,
+    });
+    expect(
+      validateJsonSchemaValue(tool.parameters, { prompt: "generate" }),
+    ).toEqual([]);
+    expect(
+      validateJsonSchemaValue(tool.parameters, { images: [] }),
+    ).not.toEqual([]);
+    expect(
+      validateJsonSchemaValue(tool.parameters, {
+        prompt: "generate",
+        unexpected: true,
+      }),
+    ).not.toEqual([]);
+    expect(
+      validateJsonSchemaValue(tool.output.schema, {
+        attachment: {
+          attachmentId: "result",
+          mediaType: "image/png",
+          bytes: png.byteLength,
+          width: 1,
+          height: 1,
+        },
+        message: "Generated image.",
+      }),
+    ).toEqual([]);
+    expect(
+      validateJsonSchemaValue(tool.output.schema, {
+        attachment: { attachmentId: "result" },
+        message: "Generated image.",
+      }),
+    ).not.toEqual([]);
     expect(
       tool.output.render(
         {},
-        { attachment: { attachmentId: "x" }, message: "Generated image." },
+        {
+          attachment: {
+            attachmentId: "x",
+            mediaType: "image/png",
+            bytes: 1,
+            width: 1,
+            height: 1,
+          },
+          message: "Generated image.",
+        },
       ),
     ).toEqual([
-      { type: "image", attachment: { attachmentId: "x" } },
+      {
+        type: "image",
+        attachment: {
+          attachmentId: "x",
+          mediaType: "image/png",
+          bytes: 1,
+          width: 1,
+          height: 1,
+        },
+      },
       { type: "text", text: "Generated image." },
     ]);
     expect(validOrDefault("not a URL")).toBe(DEFAULT_BRIDGE_URL);
 
     const writes: string[] = [];
     const scope = {
-      getSnapshot: () => ({ bridgeUrl: DEFAULT_BRIDGE_URL }),
+      getSnapshot: () => ({
+        status: "ready" as const,
+        value: { bridgeUrl: "https://persisted.example/" },
+        base: {},
+        user: {},
+        revision: 1,
+        writable: true,
+        mode: "host" as const,
+      }),
       subscribe: () => () => undefined,
       async set(_key: "bridgeUrl", value: string) {
         writes.push(value);
@@ -268,6 +360,9 @@ describe("DSH image adapter", () => {
       saveBridgeUrl(scope, "https://bridge.example/path"),
     ).rejects.toThrow("valid Kepos");
     expect(writes).toEqual(["https://bridge.example"]);
+    expect(bridgeUrlFromSnapshot(scope.getSnapshot())).toBe(
+      "https://persisted.example",
+    );
     expect(decodeSettings({ bridgeUrl: "https://bridge.example/" })).toEqual({
       bridgeUrl: "https://bridge.example",
     });

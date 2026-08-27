@@ -1,4 +1,9 @@
 import { DEFAULT_BRIDGE_URL, normalizeBridgeUrl } from "@kepos/imagegen-core";
+import type {
+  SettingsScope as DshSettingsScope,
+  SettingsScopeSnapshot,
+  SettingsScopeSpec,
+} from "@deepseek-ai/dsh-client-runtime/client";
 import { createElement, useEffect, useState } from "react";
 
 export const SETTINGS_NAMESPACE = "lamplitisles-kepos-imagegen";
@@ -8,18 +13,14 @@ export interface ClientSettings {
   bridgeUrl?: string;
 }
 
-export interface SettingsScope {
-  getSnapshot(): ClientSettings | undefined;
-  subscribe(listener: () => void): () => void;
-  set(key: "bridgeUrl", value: string): Promise<void>;
-}
+export type SettingsScope = Pick<
+  DshSettingsScope<ClientSettings>,
+  "getSnapshot" | "subscribe" | "set"
+>;
 
 type ClientContext = {
   settingsScope: {
-    bind(spec: {
-      namespace: string;
-      decode(value: unknown): ClientSettings;
-    }): SettingsScope;
+    bind(spec: SettingsScopeSpec<ClientSettings>): SettingsScope;
   };
   slots: {
     inject(name: string, callback: () => unknown): void;
@@ -47,6 +48,12 @@ export async function saveBridgeUrl(
   return bridgeUrl;
 }
 
+export function bridgeUrlFromSnapshot(
+  snapshot: SettingsScopeSnapshot<ClientSettings>,
+): string {
+  return validOrDefault(snapshot.value?.bridgeUrl);
+}
+
 export function apply(ctx: ClientContext): void {
   const scope = ctx.settingsScope.bind({
     namespace: SETTINGS_NAMESPACE,
@@ -66,7 +73,7 @@ export function apply(ctx: ClientContext): void {
 
 function SettingsCard({ scope }: { scope: SettingsScope }) {
   const [snapshot, setSnapshot] = useState(() => scope.getSnapshot());
-  const [draft, setDraft] = useState(() => validOrDefault(snapshot?.bridgeUrl));
+  const [draft, setDraft] = useState(() => bridgeUrlFromSnapshot(snapshot));
   const [feedback, setFeedback] = useState<string>();
   const [saving, setSaving] = useState(false);
 
@@ -74,7 +81,7 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
     () => scope.subscribe(() => setSnapshot(scope.getSnapshot())),
     [scope],
   );
-  useEffect(() => setDraft(validOrDefault(snapshot?.bridgeUrl)), [snapshot]);
+  useEffect(() => setDraft(bridgeUrlFromSnapshot(snapshot)), [snapshot]);
 
   const save = async () => {
     setFeedback(undefined);

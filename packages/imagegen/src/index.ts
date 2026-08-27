@@ -10,7 +10,9 @@ import {
   type ImageMediaType,
   type RequestImageOptions,
 } from "@kepos/imagegen-core";
+import type { ImageAttachmentRef } from "@deepseek-ai/dsh-attachment";
 import z from "@deepseek-ai/schemastery";
+import { defineTool, type ToolDefinition } from "@deepseek-ai/dsh-tools";
 
 export const name = "lamplitisles-kepos-imagegen";
 export const inject = ["attachments", "fs", "settings", "tools"] as const;
@@ -51,7 +53,7 @@ export interface DshAttachments {
     data: Uint8Array;
     mediaType: "image/png";
     name?: string;
-  }): Promise<unknown>;
+  }): Promise<ImageAttachmentRef>;
 }
 
 export interface DshExecution {
@@ -72,9 +74,13 @@ export interface DshPluginServices {
 }
 
 export interface DshToolResult {
-  attachment: unknown;
+  attachment: DshPngAttachment;
   message: string;
 }
+
+type DshPngAttachment = Omit<ImageAttachmentRef, "mediaType"> & {
+  mediaType: "image/png";
+};
 
 type DshContext = {
   attachments: DshAttachments;
@@ -87,12 +93,30 @@ type DshContext = {
       get(): { bridgeUrl?: unknown };
     };
   };
-  tools: { register(definition: unknown): unknown };
+  tools: { register(definition: ToolDefinition): unknown };
 };
+
+const toolParameters = {
+  type: "object",
+  properties: {
+    prompt: {
+      type: "string",
+      description: "Required nonblank image-generation prompt.",
+    },
+    images: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Optional one to five nonblank paths relative to the active workspace.",
+    },
+  },
+  required: ["prompt"],
+  additionalProperties: false,
+} as const;
 
 export function apply(ctx: DshContext): void {
   const scope = ctx.settings.register(SETTINGS_NAMESPACE, SettingsSchema);
-  ctx.tools.register({
+  const tool = defineTool({
     name: "kepos_image_generate",
     description:
       "Generate a PNG with Kepos. For an edit, provide one through five PNG, JPEG, GIF, or WebP paths relative to the active workspace; omit images to generate.",
@@ -112,19 +136,31 @@ export function apply(ctx: DshContext): void {
       schema: {
         type: "object",
         properties: {
-          attachment: { type: "json" },
-          message: { type: "string" },
+          attachment: {
+            type: "object",
+            properties: {
+              attachmentId: { type: "string", required: true },
+              mediaType: { type: "string", const: "image/png", required: true },
+              bytes: { type: "integer", required: true },
+              width: { type: "integer", required: true },
+              height: { type: "integer", required: true },
+              name: { type: "string" },
+            },
+            additionalProperties: false,
+            required: true,
+          },
+          message: { type: "string", required: true },
         },
         additionalProperties: false,
       },
-      render(_args: unknown, value: DshToolResult) {
+      render(_args, value) {
         return [
-          { type: "image", attachment: value.attachment },
+          { type: "image", attachment: value.attachment as ImageAttachmentRef },
           { type: "text", text: value.message },
         ];
       },
     },
-    async execute(args: unknown, exec: DshExecution) {
+    async execute(args, exec) {
       return generateWithDsh(args, exec, {
         attachments: ctx.attachments,
         fs: ctx.fs,
@@ -133,6 +169,7 @@ export function apply(ctx: DshContext): void {
       });
     },
   });
+  ctx.tools.register({ ...tool, parameters: toolParameters });
 }
 
 export async function generateWithDsh(
@@ -159,15 +196,24 @@ export async function generateWithDsh(
     if (sourceUrls !== undefined) request.images = sourceUrls;
     if (exec.signal !== undefined) request.signal = exec.signal;
     const result = await requestImage(request);
-    const attachment = await services.attachments.saveImage({
-      data: result.data,
-      mediaType: "image/png",
-      name: "kepos-image.png",
-    });
+    const attachment = asPngAttachment(
+      await services.attachments.saveImage({
+        data: result.data,
+        mediaType: "image/png",
+        name: "kepos-image.png",
+      }),
+    );
     return { attachment, message: "Generated image." };
   } catch (error) {
     throw safeDshError(error);
   }
+}
+
+function asPngAttachment(attachment: ImageAttachmentRef): DshPngAttachment {
+  if (attachment.mediaType !== "image/png") {
+    throw new ImagegenError("Unable to save the generated image.");
+  }
+  return attachment as DshPngAttachment;
 }
 
 function parseArgs(value: unknown): DshImageArgs {

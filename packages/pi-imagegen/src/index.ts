@@ -14,7 +14,7 @@ import {
   getAgentDir,
   type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
-import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, realpath, writeFile } from "node:fs/promises";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 import { Type } from "typebox";
 
@@ -40,19 +40,30 @@ export interface PiDependencies {
 const nodeFileOperations: FileOperations = {
   realpath,
   async readImage(path, maxBytes) {
-    const metadata = await stat(path);
-    if (!metadata.isFile() || metadata.size > maxBytes) {
-      throw new ImagegenError(
-        "A source image is invalid or too large for the Kepos bridge.",
-      );
+    const handle = await open(path, "r");
+    try {
+      if (!(await handle.stat()).isFile()) {
+        throw invalidSourceImage();
+      }
+      const buffer = new Uint8Array(maxBytes + 1);
+      let bytesRead = 0;
+      while (bytesRead < buffer.byteLength) {
+        const read = await handle.read(
+          buffer,
+          bytesRead,
+          buffer.byteLength - bytesRead,
+          bytesRead,
+        );
+        if (read.bytesRead === 0) break;
+        bytesRead += read.bytesRead;
+      }
+      if (bytesRead === 0 || bytesRead > maxBytes) {
+        throw invalidSourceImage();
+      }
+      return buffer.slice(0, bytesRead);
+    } finally {
+      await handle.close();
     }
-    const data = new Uint8Array(await readFile(path));
-    if (data.byteLength === 0 || data.byteLength > maxBytes) {
-      throw new ImagegenError(
-        "A source image is invalid or too large for the Kepos bridge.",
-      );
-    }
-    return data;
   },
   async readText(path) {
     return readFile(path, "utf8");
@@ -64,6 +75,12 @@ const nodeFileOperations: FileOperations = {
     await mkdir(path, { recursive: true });
   },
 };
+
+function invalidSourceImage(): ImagegenError {
+  return new ImagegenError(
+    "A source image is invalid or too large for the Kepos bridge.",
+  );
+}
 
 const toolParameters = Type.Object(
   {

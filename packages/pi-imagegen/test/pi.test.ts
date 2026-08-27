@@ -1,8 +1,12 @@
 import {
   DEFAULT_BRIDGE_URL,
   MAX_BRIDGE_JSON_BYTES,
+  remainingSourceBytes,
   type RequestImageOptions,
 } from "@kepos/imagegen-core";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   CONFIG_FILE_NAME,
@@ -201,6 +205,48 @@ describe("Pi image adapter", () => {
       ),
     ).rejects.toThrow("too large");
     expect(fs.limits).toEqual([]);
+  });
+
+  it("bounds production file reads to the remaining bridge budget", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "kepos-imagegen-test-"));
+    try {
+      const source = join(directory, "source.png");
+      const maxBytes = remainingSourceBytes("edit", [], "image/png");
+      const data = new Uint8Array(maxBytes + 1);
+      data.set(png);
+      await writeFile(source, data);
+
+      let tool: any;
+      let requests = 0;
+      installPiImagegen(
+        {
+          registerTool(definition: unknown) {
+            tool = definition;
+          },
+          registerCommand() {},
+        } as any,
+        {
+          getAgentDirectory: () => directory,
+          request: async () => {
+            requests += 1;
+            return { data: png, mediaType: "image/png" as const };
+          },
+        },
+      );
+
+      await expect(
+        tool.execute(
+          "overflow",
+          { prompt: "edit", images: ["source.png"] },
+          undefined,
+          undefined,
+          { cwd: directory },
+        ),
+      ).rejects.toThrow("invalid or too large");
+      expect(requests).toBe(0);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("uses only the global bridgeUrl config with invalid fallback and interactive settings", async () => {
