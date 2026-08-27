@@ -4,8 +4,8 @@ import { join } from "node:path";
 
 export const PUBLIC_PACKAGES = [
   {
-    directory: "imagegen",
-    name: "@kepos/dsh-imagegen",
+    directory: "dsh-imagegen",
+    name: "@lamplitisles/dsh-imagegen",
     requiredFiles: [
       "dist/index.js",
       "dist/index.d.ts",
@@ -15,7 +15,7 @@ export const PUBLIC_PACKAGES = [
   },
   {
     directory: "pi-imagegen",
-    name: "@kepos/pi-imagegen",
+    name: "@lamplitisles/pi-imagegen",
     requiredFiles: ["dist/index.js", "dist/index.d.ts"],
   },
 ] as const;
@@ -45,10 +45,10 @@ export function readJson(path: string): Record<string, unknown> {
 export function checkReleaseManifests(root: string, tag: string): string[] {
   const errors: string[] = [];
   const version = versionFromTag(tag);
-  const repository = "https://github.com/lamplitisles/kepos-imagegen.git";
+  const repository = "https://github.com/LamplitIsles/kepos-imagegen.git";
   const core = readJson(join(root, "packages/imagegen-core/package.json"));
   if (core.private !== true) {
-    errors.push("@kepos/imagegen-core must remain private.");
+    errors.push("@lamplitisles/imagegen-core must remain private.");
   }
 
   for (const entry of PUBLIC_PACKAGES) {

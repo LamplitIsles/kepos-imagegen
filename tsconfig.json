@@ -10,7 +10,7 @@
     "exactOptionalPropertyTypes": true,
     "baseUrl": ".",
     "paths": {
-      "@kepos/imagegen-core": ["packages/imagegen-core/src/index.ts"]
+      "@lamplitisles/imagegen-core": ["packages/imagegen-core/src/index.ts"]
     }
   },
   "include": ["packages/**/*.ts", "scripts/**/*.ts", "tsup.config.ts"],

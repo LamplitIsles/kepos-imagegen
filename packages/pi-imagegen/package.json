@@ -1,11 +1,11 @@
 {
-  "name": "@kepos/pi-imagegen",
+  "name": "@lamplitisles/pi-imagegen",
   "version": "0.1.0",
   "description": "Kepos bridge image generation extension for Pi",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lamplitisles/kepos-imagegen.git",
+    "url": "https://github.com/LamplitIsles/kepos-imagegen.git",
     "directory": "packages/pi-imagegen"
   },
   "type": "module",

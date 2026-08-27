@@ -9,7 +9,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@kepos/imagegen-core": new URL(
+      "@lamplitisles/imagegen-core": new URL(
         "./packages/imagegen-core/src/index.ts",
         import.meta.url,
       ).pathname,

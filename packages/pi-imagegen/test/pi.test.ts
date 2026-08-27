@@ -3,7 +3,7 @@ import {
   MAX_BRIDGE_JSON_BYTES,
   remainingSourceBytes,
   type RequestImageOptions,
-} from "@kepos/imagegen-core";
+} from "@lamplitisles/imagegen-core";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
