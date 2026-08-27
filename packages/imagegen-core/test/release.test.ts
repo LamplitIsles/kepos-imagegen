@@ -28,7 +28,7 @@ async function fixture(): Promise<string> {
   );
   await writeFile(
     join(root, "packages/imagegen/package.json"),
-    JSON.stringify({ ...packageJson, name: "@kepos/imagegen" }),
+    JSON.stringify({ ...packageJson, name: "@kepos/dsh-imagegen" }),
   );
   await writeFile(
     join(root, "packages/pi-imagegen/package.json"),
