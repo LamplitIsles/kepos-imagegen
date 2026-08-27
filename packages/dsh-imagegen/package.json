@@ -1,12 +1,12 @@
 {
-  "name": "@kepos/dsh-imagegen",
+  "name": "@lamplitisles/dsh-imagegen",
   "version": "0.1.0",
   "description": "Kepos bridge image generation for DeepSeek Harness",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lamplitisles/kepos-imagegen.git",
-    "directory": "packages/imagegen"
+    "url": "https://github.com/LamplitIsles/kepos-imagegen.git",
+    "directory": "packages/dsh-imagegen"
   },
   "type": "module",
   "main": "dist/index.js",
@@ -74,6 +74,6 @@
   },
   "scripts": {
     "build": "tsup",
-    "test": "vitest run --root ../.. packages/imagegen/test"
+    "test": "vitest run --root ../.. packages/dsh-imagegen/test"
   }
 }

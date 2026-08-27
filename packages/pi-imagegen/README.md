@@ -3,7 +3,7 @@
 Install it with:
 
 ```sh
-pi install npm:@kepos/pi-imagegen
+pi install npm:@lamplitisles/pi-imagegen
 ```
 
 Use `/kepos-image-settings` to view or change the Kepos bridge address. The

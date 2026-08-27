@@ -3,7 +3,7 @@
 Install it in a DSH profile:
 
 ```sh
-dsh plugin --profile <profile> add @kepos/dsh-imagegen
+dsh plugin --profile <profile> add @lamplitisles/dsh-imagegen
 ```
 
 Open DSH Settings and use **Kepos Image Generation** to set the bridge address. The

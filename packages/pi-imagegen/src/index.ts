@@ -9,7 +9,7 @@ import {
   requestImage,
   type ImageMediaType,
   type RequestImageOptions,
-} from "@kepos/imagegen-core";
+} from "@lamplitisles/imagegen-core";
 import {
   getAgentDir,
   type ExtensionAPI,

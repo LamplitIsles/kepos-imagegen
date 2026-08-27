@@ -27,7 +27,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)
 
-  packages/imagegen:
+  packages/dsh-imagegen:
     dependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.1

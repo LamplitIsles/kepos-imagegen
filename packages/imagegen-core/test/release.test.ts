@@ -15,24 +15,24 @@ async function fixture(): Promise<string> {
     version: "0.1.0",
     repository: {
       type: "git",
-      url: "https://github.com/lamplitisles/kepos-imagegen.git",
+      url: "https://github.com/LamplitIsles/kepos-imagegen.git",
     },
     publishConfig: { registry: "https://registry.npmjs.org", access: "public" },
   };
   await mkdir(join(root, "packages/imagegen-core"), { recursive: true });
-  await mkdir(join(root, "packages/imagegen"), { recursive: true });
+  await mkdir(join(root, "packages/dsh-imagegen"), { recursive: true });
   await mkdir(join(root, "packages/pi-imagegen"), { recursive: true });
   await writeFile(
     join(root, "packages/imagegen-core/package.json"),
     JSON.stringify({ private: true }),
   );
   await writeFile(
-    join(root, "packages/imagegen/package.json"),
-    JSON.stringify({ ...packageJson, name: "@kepos/dsh-imagegen" }),
+    join(root, "packages/dsh-imagegen/package.json"),
+    JSON.stringify({ ...packageJson, name: "@lamplitisles/dsh-imagegen" }),
   );
   await writeFile(
     join(root, "packages/pi-imagegen/package.json"),
-    JSON.stringify({ ...packageJson, name: "@kepos/pi-imagegen" }),
+    JSON.stringify({ ...packageJson, name: "@lamplitisles/pi-imagegen" }),
   );
   return root;
 }
@@ -60,11 +60,11 @@ describe("release invariants", () => {
     await writeFile(
       join(root, "packages/pi-imagegen/package.json"),
       JSON.stringify({
-        name: "@kepos/pi-imagegen",
+        name: "@lamplitisles/pi-imagegen",
         version: "0.1.1",
         repository: {
           type: "git",
-          url: "https://github.com/lamplitisles/kepos-imagegen.git",
+          url: "https://github.com/LamplitIsles/kepos-imagegen.git",
         },
         publishConfig: {
           registry: "https://registry.npmjs.org",
@@ -73,14 +73,14 @@ describe("release invariants", () => {
       }),
     );
     expect(releaseCheck(root, "v0.1.0", false)).toContain(
-      "@kepos/pi-imagegen version does not match v0.1.0.",
+      "@lamplitisles/pi-imagegen version does not match v0.1.0.",
     );
   });
 
   it("synchronizes both public package versions from a prerelease tag", async () => {
     const root = await fixture();
     await synchronizeReleaseVersions(root, "v0.1.0-beta.1");
-    for (const directory of ["imagegen", "pi-imagegen"]) {
+    for (const directory of ["dsh-imagegen", "pi-imagegen"]) {
       const manifest = JSON.parse(
         await readFile(
           join(root, `packages/${directory}/package.json`),

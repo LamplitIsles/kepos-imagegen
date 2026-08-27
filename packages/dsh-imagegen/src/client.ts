@@ -1,4 +1,7 @@
-import { DEFAULT_BRIDGE_URL, normalizeBridgeUrl } from "@kepos/imagegen-core";
+import {
+  DEFAULT_BRIDGE_URL,
+  normalizeBridgeUrl,
+} from "@lamplitisles/imagegen-core";
 import type {
   SettingsScope as DshSettingsScope,
   SettingsScopeSnapshot,

@@ -9,7 +9,7 @@ import {
   requestImage,
   type ImageMediaType,
   type RequestImageOptions,
-} from "@kepos/imagegen-core";
+} from "@lamplitisles/imagegen-core";
 import type { ImageAttachmentRef } from "@deepseek-ai/dsh-attachment";
 import z from "@deepseek-ai/schemastery";
 import { defineTool, type ToolDefinition } from "@deepseek-ai/dsh-tools";
