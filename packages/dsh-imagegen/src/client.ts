@@ -12,6 +12,7 @@ import type { ImageAttachmentRef } from "@deepseek-ai/dsh-attachment";
 import type { ToolCallViewProps } from "@deepseek-ai/dsh-client-ui-tool/client";
 import { createElement, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import cssText from "./client.css";
 
 export const SETTINGS_NAMESPACE = "lamplitisles-kepos-imagegen";
 export const inject = ["sessions", "settingsScope", "slots"] as const;
@@ -37,6 +38,7 @@ type ClientContext = {
       content: unknown,
     ): unknown;
   };
+  effect(callback: () => void | (() => void), name?: string): void;
 };
 
 export function decodeSettings(value: unknown): ClientSettings {
@@ -63,6 +65,7 @@ export function bridgeUrlFromSnapshot(
 }
 
 export function apply(ctx: ClientContext): void {
+  ctx.effect(() => installStyles(cssText), "kepos-imagegen: styles");
   const scope = ctx.settingsScope.bind({
     namespace: SETTINGS_NAMESPACE,
     decode: decodeSettings,
@@ -136,12 +139,16 @@ function ImageToolCard({ block, sessionId, sessions }: ImageToolCardProps) {
   }, [previewOpen]);
 
   if (!isToolResult(block)) {
-    return createElement("p", { style: cardStyle }, "Generating image…");
+    return createElement(
+      "p",
+      { className: "kepos-imagegen__notice" },
+      "Generating image…",
+    );
   }
   if (block.isError || !attachment) {
     return createElement(
       "p",
-      { style: cardStyle },
+      { className: "kepos-imagegen__notice", role: "alert" },
       block.error
         ? `Image generation failed: ${block.error.name}.`
         : "Image generation failed.",
@@ -157,8 +164,15 @@ function ImageToolCard({ block, sessionId, sessions }: ImageToolCardProps) {
   };
   return createElement(
     "section",
-    { style: cardStyle, "aria-label": "Generated Kepos image" },
-    createElement("p", { style: statusStyle }, "Image generated"),
+    {
+      className: "kepos-imagegen__card",
+      "aria-label": "Generated Kepos image",
+    },
+    createElement(
+      "p",
+      { className: "kepos-imagegen__status" },
+      "Image generated",
+    ),
     loadFailed
       ? createElement("p", null, "Could not load the image preview.")
       : createElement(
@@ -168,23 +182,32 @@ function ImageToolCard({ block, sessionId, sessions }: ImageToolCardProps) {
             disabled: !src,
             onClick: () => setPreviewOpen(true),
             title: "Open image preview",
-            style: imageButtonStyle,
+            className: "kepos-imagegen__thumbnail",
           },
           src
             ? createElement("img", {
                 src,
                 alt: name,
-                style: imageStyle,
+                className: "kepos-imagegen__image",
               })
             : "Loading image…",
         ),
     createElement(
       "div",
-      { style: actionStyle },
-      createElement("code", { style: pathStyle }, outputPath(block)),
+      { className: "kepos-imagegen__actions" },
+      createElement(
+        "code",
+        { className: "kepos-imagegen__path", title: outputPath(block) },
+        outputPath(block),
+      ),
       createElement(
         "button",
-        { type: "button", onClick: download, disabled: !src },
+        {
+          type: "button",
+          onClick: download,
+          disabled: !src,
+          className: "kepos-imagegen__button",
+        },
         "Download PNG",
       ),
     ),
@@ -196,20 +219,24 @@ function ImageToolCard({ block, sessionId, sessions }: ImageToolCardProps) {
               role: "dialog",
               "aria-modal": true,
               "aria-label": "Image preview",
-              style: lightboxStyle,
+              className: "kepos-imagegen__lightbox",
             },
             createElement("div", {
               "aria-hidden": true,
               onMouseDown: () => setPreviewOpen(false),
-              style: backdropStyle,
+              className: "kepos-imagegen__backdrop",
             }),
-            createElement("img", { src, alt: name, style: previewStyle }),
+            createElement("img", {
+              src,
+              alt: name,
+              className: "kepos-imagegen__preview",
+            }),
             createElement(
               "button",
               {
                 type: "button",
                 onClick: () => setPreviewOpen(false),
-                style: closeStyle,
+                className: "kepos-imagegen__close",
               },
               "Close",
             ),
@@ -242,65 +269,6 @@ function isToolResult(
   return "kind" in block && block.kind === "tool-result";
 }
 
-const cardStyle = {
-  display: "grid",
-  gap: "10px",
-  maxWidth: "360px",
-  padding: "12px",
-  border: "1px solid var(--dsw-alias-border-l2-darkmode-thin, #d7d7d7)",
-  borderRadius: "12px",
-  background: "var(--dsw-specific-input-major, #fff)",
-} as const;
-const statusStyle = { margin: 0, fontWeight: 600 } as const;
-const imageButtonStyle = {
-  padding: 0,
-  overflow: "hidden",
-  border: 0,
-  borderRadius: "8px",
-  cursor: "zoom-in",
-  background: "transparent",
-} as const;
-const imageStyle = {
-  display: "block",
-  width: "100%",
-  maxHeight: "280px",
-  objectFit: "contain",
-  background: "#111",
-} as const;
-const actionStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  justifyContent: "space-between",
-} as const;
-const pathStyle = {
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  fontSize: "12px",
-} as const;
-const lightboxStyle = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 1000,
-  display: "grid",
-  placeItems: "center",
-  padding: "40px",
-} as const;
-const backdropStyle = {
-  position: "absolute",
-  inset: 0,
-  background: "rgba(0, 0, 0, 0.78)",
-} as const;
-const previewStyle = {
-  position: "relative",
-  maxWidth: "min(100%, 1600px)",
-  maxHeight: "calc(100vh - 80px)",
-  objectFit: "contain",
-  borderRadius: "12px",
-} as const;
-const closeStyle = { position: "fixed", top: "20px", right: "20px" } as const;
-
 function SettingsCard({ scope }: { scope: SettingsScope }) {
   const [snapshot, setSnapshot] = useState(() => scope.getSnapshot());
   const [draft, setDraft] = useState(() => bridgeUrlFromSnapshot(snapshot));
@@ -328,42 +296,69 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
 
   return createElement(
     "section",
-    { "aria-labelledby": "kepos-image-settings-title" },
+    {
+      className: "kepos-imagegen__settings",
+      "aria-labelledby": "kepos-image-settings-title",
+    },
     createElement(
       "h2",
-      { id: "kepos-image-settings-title" },
+      {
+        id: "kepos-image-settings-title",
+        className: "kepos-imagegen__settings-title",
+      },
       "Kepos Image Generation",
     ),
     createElement(
       "p",
-      null,
+      { className: "kepos-imagegen__settings-copy" },
       "The Kepos bridge appends /codex/images to this address.",
     ),
     createElement(
       "label",
-      { htmlFor: "kepos-image-bridge-url" },
+      {
+        htmlFor: "kepos-image-bridge-url",
+        className: "kepos-imagegen__label",
+      },
       "Kepos bridge address",
     ),
     createElement("input", {
       id: "kepos-image-bridge-url",
       type: "text",
       value: draft,
+      className: "kepos-imagegen__input",
       onChange: (event: { target: { value: string } }) =>
         setDraft(event.target.value),
     }),
     createElement(
       "button",
-      { type: "button", onClick: () => void save(), disabled: saving },
+      {
+        type: "button",
+        onClick: () => void save(),
+        disabled: saving,
+        className: "kepos-imagegen__button",
+      },
       saving ? "Saving…" : "Save",
     ),
     feedback
       ? createElement(
           "p",
-          { role: feedback === "Saved." ? "status" : "alert" },
+          {
+            role: feedback === "Saved." ? "status" : "alert",
+            className: "kepos-imagegen__feedback",
+            "data-state": feedback === "Saved." ? "success" : "error",
+          },
           feedback,
         )
       : null,
   );
+}
+
+function installStyles(css: string): () => void {
+  const style = document.createElement("style");
+  style.dataset.dshPlugin = "kepos-imagegen";
+  style.textContent = css;
+  document.head.append(style);
+  return () => style.remove();
 }
 
 function validOrDefault(value: unknown): string {

@@ -31,6 +31,7 @@ export default defineConfig([
     entry: { client: "src/client.ts" },
     format: ["cjs"],
     platform: "browser",
+    loader: { ".css": "text" },
     dts: true,
     external,
     noExternal: ["@lamplitisles/imagegen-core"],
