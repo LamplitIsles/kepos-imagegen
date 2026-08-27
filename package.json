@@ -1,0 +1,30 @@
+{
+  "name": "kepos-imagegen-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm --recursive --if-present run build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:core": "vitest run packages/imagegen-core/test",
+    "test:dsh": "vitest run packages/imagegen/test",
+    "test:pi": "vitest run packages/pi-imagegen/test",
+    "test:pack": "tsx scripts/pack-smoke.ts",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown",
+    "release:sync-version": "tsx scripts/sync-release-version.ts",
+    "release:check": "tsx scripts/release-check.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "prettier": "^3.6.2",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

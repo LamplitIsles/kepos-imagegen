@@ -1,0 +1,278 @@
+import {
+  DEFAULT_BRIDGE_URL,
+  MAX_BRIDGE_JSON_BYTES,
+} from "@kepos/imagegen-core";
+import { describe, expect, it } from "vitest";
+import {
+  SETTINGS_NAMESPACE,
+  apply,
+  generateWithDsh,
+  inject,
+  validOrDefault,
+  type DshAttachments,
+  type DshFileSystem,
+} from "../src/index.js";
+import { decodeSettings, saveBridgeUrl } from "../src/client.js";
+
+const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+
+type Target = { targetKey: string };
+
+function fakeFileSystem(
+  options: {
+    outside?: boolean;
+    type?: string;
+    bytes?: Uint8Array;
+  } = {},
+): DshFileSystem & { limits: number[] } {
+  const limits: number[] = [];
+  return {
+    limits,
+    async resolve(path, resolveOptions) {
+      if (path === "/workspace") return { targetKey: "/workspace" };
+      if (options.outside && path === "link.png")
+        return { targetKey: "/outside/secret.png" };
+      return { targetKey: `${resolveOptions?.cwd ?? ""}/${path}` };
+    },
+    contains(parent, child) {
+      return (child as Target).targetKey.startsWith(
+        `${(parent as Target).targetKey}/`,
+      );
+    },
+    async stat() {
+      return { type: options.type ?? "file" };
+    },
+    async readBytes(_target, _signal, maxBytes) {
+      limits.push(maxBytes);
+      return options.bytes ?? png;
+    },
+  };
+}
+
+function fakeAttachments(): DshAttachments & {
+  saved: unknown[];
+  validated: number;
+} {
+  const saved: unknown[] = [];
+  let validated = 0;
+  return {
+    saved,
+    get validated() {
+      return validated;
+    },
+    async validateImage() {
+      validated += 1;
+    },
+    async saveImage(input) {
+      const attachment = {
+        attachmentId: "result",
+        mediaType: input.mediaType,
+        bytes: input.data.byteLength,
+      };
+      saved.push(attachment);
+      return attachment;
+    },
+  };
+}
+
+function bridgeFetch(
+  calls: Array<{ url: string; init: RequestInit | undefined }>,
+): typeof fetch {
+  return (async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), init });
+    return new Response(
+      JSON.stringify({ image_url: "data:image/png;base64,iVBORw0KGgoA" }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+}
+
+describe("DSH image adapter", () => {
+  it("edits workspace-relative images, validates attachments, and saves a durable native result", async () => {
+    const fs = fakeFileSystem();
+    const attachments = fakeAttachments();
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const controller = new AbortController();
+
+    const result = await generateWithDsh(
+      { prompt: "make it watercolor", images: ["source.png"] },
+      {
+        signal: controller.signal,
+        agent: { session: { header: { cwd: "/workspace" } } },
+      },
+      {
+        fs,
+        attachments,
+        fetch: bridgeFetch(calls),
+        getBridgeUrl: () => "https://bridge.example/",
+      },
+    );
+
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      prompt: "make it watercolor",
+      images: ["data:image/png;base64,iVBORw0KGgoA"],
+    });
+    expect(calls[0]?.url).toBe("https://bridge.example/codex/images");
+    expect(calls[0]?.init?.signal).toBe(controller.signal);
+    expect(attachments.validated).toBe(1);
+    expect(attachments.saved).toHaveLength(1);
+    expect(result).toEqual({
+      attachment: {
+        attachmentId: "result",
+        mediaType: "image/png",
+        bytes: png.byteLength,
+      },
+      message: "Generated image.",
+    });
+    expect(fs.limits[0]).toBeGreaterThan(png.byteLength);
+  });
+
+  it("accepts five sources, omits sources for generation, and rejects a sixth", async () => {
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const services = {
+      fs: fakeFileSystem(),
+      attachments: fakeAttachments(),
+      fetch: bridgeFetch(calls),
+      getBridgeUrl: () => DEFAULT_BRIDGE_URL,
+    };
+    const exec = { agent: { session: { header: { cwd: "/workspace" } } } };
+
+    await generateWithDsh(
+      { prompt: "edit", images: ["1.png", "2.png", "3.png", "4.png", "5.png"] },
+      exec,
+      services,
+    );
+    expect(JSON.parse(String(calls[0]?.init?.body)).images).toHaveLength(5);
+    await generateWithDsh({ prompt: "generate" }, {}, services);
+    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({
+      prompt: "generate",
+    });
+    await expect(
+      generateWithDsh(
+        {
+          prompt: "edit",
+          images: ["1.png", "2.png", "3.png", "4.png", "5.png", "6.png"],
+        },
+        exec,
+        services,
+      ),
+    ).rejects.toThrow("between one and five");
+  });
+
+  it("fails source boundary violations without exposing host paths", async () => {
+    const baseServices = {
+      attachments: fakeAttachments(),
+      fetch: bridgeFetch([]),
+      getBridgeUrl: () => DEFAULT_BRIDGE_URL,
+    };
+    const exec = { agent: { session: { header: { cwd: "/workspace" } } } };
+    const failures = [
+      generateWithDsh({ prompt: "edit", images: ["/etc/passwd"] }, exec, {
+        ...baseServices,
+        fs: fakeFileSystem(),
+      }),
+      generateWithDsh({ prompt: "edit", images: ["link.png"] }, exec, {
+        ...baseServices,
+        fs: fakeFileSystem({ outside: true }),
+      }),
+      generateWithDsh({ prompt: "edit", images: ["pipe.png"] }, exec, {
+        ...baseServices,
+        fs: fakeFileSystem({ type: "other" }),
+      }),
+      generateWithDsh({ prompt: "edit", images: ["source.txt"] }, exec, {
+        ...baseServices,
+        fs: fakeFileSystem(),
+      }),
+      generateWithDsh({ prompt: "edit", images: ["source.png"] }, exec, {
+        ...baseServices,
+        fs: fakeFileSystem({
+          bytes: new Uint8Array([137, 80, 78, 71, 0, 0, 0, 0]),
+        }),
+      }),
+      generateWithDsh(
+        { prompt: "edit", images: ["source.png"] },
+        {},
+        {
+          ...baseServices,
+          fs: fakeFileSystem(),
+        },
+      ),
+    ];
+
+    for (const failure of failures) {
+      await expect(failure).rejects.not.toThrow("/workspace");
+      await expect(failure).rejects.not.toThrow("/outside");
+    }
+  });
+
+  it("stops before a read when the dynamic bridge budget is exhausted", async () => {
+    const fs = fakeFileSystem();
+    await expect(
+      generateWithDsh(
+        { prompt: "x".repeat(MAX_BRIDGE_JSON_BYTES), images: ["source.png"] },
+        { agent: { session: { header: { cwd: "/workspace" } } } },
+        {
+          fs,
+          attachments: fakeAttachments(),
+          fetch: bridgeFetch([]),
+          getBridgeUrl: () => DEFAULT_BRIDGE_URL,
+        },
+      ),
+    ).rejects.toThrow("too large");
+    expect(fs.limits).toEqual([]);
+  });
+
+  it("registers one sequential tool with a native attachment renderer and safe settings fallback", async () => {
+    let tool: any;
+    const context = {
+      attachments: fakeAttachments(),
+      fs: fakeFileSystem(),
+      settings: {
+        register(namespace: unknown) {
+          expect(namespace).toBe(SETTINGS_NAMESPACE);
+          return { get: () => ({ bridgeUrl: "not a URL" }) };
+        },
+      },
+      tools: {
+        register(definition: unknown) {
+          tool = definition;
+        },
+      },
+    };
+    apply(context);
+    expect(inject).toEqual(["attachments", "fs", "settings", "tools"]);
+    expect(tool.name).toBe("kepos_image_generate");
+    expect(
+      tool.output.render(
+        {},
+        { attachment: { attachmentId: "x" }, message: "Generated image." },
+      ),
+    ).toEqual([
+      { type: "image", attachment: { attachmentId: "x" } },
+      { type: "text", text: "Generated image." },
+    ]);
+    expect(validOrDefault("not a URL")).toBe(DEFAULT_BRIDGE_URL);
+
+    const writes: string[] = [];
+    const scope = {
+      getSnapshot: () => ({ bridgeUrl: DEFAULT_BRIDGE_URL }),
+      subscribe: () => () => undefined,
+      async set(_key: "bridgeUrl", value: string) {
+        writes.push(value);
+      },
+    };
+    await expect(saveBridgeUrl(scope, "https://bridge.example/")).resolves.toBe(
+      "https://bridge.example",
+    );
+    await expect(
+      saveBridgeUrl(scope, "https://bridge.example/path"),
+    ).rejects.toThrow("valid Kepos");
+    expect(writes).toEqual(["https://bridge.example"]);
+    expect(decodeSettings({ bridgeUrl: "https://bridge.example/" })).toEqual({
+      bridgeUrl: "https://bridge.example",
+    });
+    expect(decodeSettings({ bridgeUrl: "unsafe/path" })).toEqual({
+      bridgeUrl: DEFAULT_BRIDGE_URL,
+    });
+  });
+});
