@@ -78,7 +78,7 @@ jobs:
           PACKAGE: ${{ matrix.package }}
         run: |
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
-            npm publish "./packages/$PACKAGE" --no-git-checks --access public --provenance --tag beta
+            npm publish "./packages/$PACKAGE" --access public --provenance --tag beta
           else
-            npm publish "./packages/$PACKAGE" --no-git-checks --access public --provenance --tag latest
+            npm publish "./packages/$PACKAGE" --access public --provenance --tag latest
           fi
