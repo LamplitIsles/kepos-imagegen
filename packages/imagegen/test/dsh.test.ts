@@ -2,6 +2,8 @@ import {
   DEFAULT_BRIDGE_URL,
   MAX_BRIDGE_JSON_BYTES,
 } from "@kepos/imagegen-core";
+import { Context, Service } from "@deepseek-ai/cordis";
+import { SettingsProvider, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import {
   assertSupportedJsonSchema,
   validateJsonSchemaValue,
@@ -25,6 +27,23 @@ import {
 const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
 
 type Target = { targetKey: string };
+
+class MemorySettingsProvider extends SettingsProvider {
+  readonly writable = true;
+
+  constructor(
+    ctx: Context,
+    private readonly storedDocument: Record<string, unknown>,
+  ) {
+    super(ctx);
+  }
+
+  protected async load(): Promise<Record<string, unknown>> {
+    return this.storedDocument;
+  }
+
+  protected async persist(): Promise<void> {}
+}
 
 function fakeFileSystem(
   options: {
@@ -99,6 +118,31 @@ function bridgeFetch(
 }
 
 describe("DSH image adapter", () => {
+  it("registers a persisted non-string bridge URL with the default fallback", async () => {
+    const context = new Context();
+    const settings = new MemorySettingsProvider(context, {
+      [SETTINGS_NAMESPACE]: { bridgeUrl: 42 },
+    });
+    const initialization = settings[Service.init]();
+    const cleanup = await initialization.next();
+    await initialization.next();
+    try {
+      apply({
+        attachments: fakeAttachments(),
+        fs: fakeFileSystem(),
+        settings,
+        tools: { register() {} },
+      } as any);
+
+      expect(settings.get(settingsNamespace(SETTINGS_NAMESPACE))).toEqual({
+        bridgeUrl: DEFAULT_BRIDGE_URL,
+      });
+      expect(validOrDefault("unsafe/path")).toBe(DEFAULT_BRIDGE_URL);
+    } finally {
+      if (typeof cleanup.value === "function") await cleanup.value();
+    }
+  });
+
   it("edits workspace-relative images, validates attachments, and saves a durable native result", async () => {
     const fs = fakeFileSystem();
     const attachments = fakeAttachments();

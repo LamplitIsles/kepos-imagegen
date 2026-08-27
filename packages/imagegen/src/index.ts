@@ -19,7 +19,7 @@ export const inject = ["attachments", "fs", "settings", "tools"] as const;
 export const SETTINGS_NAMESPACE = "lamplitisles-kepos-imagegen";
 
 export const SettingsSchema = z.object({
-  bridgeUrl: z.string().default(DEFAULT_BRIDGE_URL),
+  bridgeUrl: z.string().default(DEFAULT_BRIDGE_URL).loose(),
 });
 
 export interface DshTarget {

@@ -77,6 +77,10 @@ async function smokeDsh(): Promise<void> {
     "DSH rc.8 peer is incorrect.",
   );
   requireCondition(
+    manifest.peerDependencies?.["@deepseek-ai/dsh-attachment"] === "0.1.0-rc.8",
+    "DSH attachment peer is incorrect.",
+  );
+  requireCondition(
     manifest.peerDependencies?.["@deepseek-ai/dsh-client-runtime"] ===
       "0.1.0-rc.8",
     "DSH client peer is incorrect.",
