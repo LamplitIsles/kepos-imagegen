@@ -4,7 +4,9 @@ import type {
   SettingsScopeSnapshot,
   SettingsScopeSpec,
 } from "@deepseek-ai/dsh-client-runtime/client";
-import { createElement, useEffect, useState } from "react";
+import { IconChevronDownOutline14 } from "@deepseek-ai/dsh-client-ui-primitives";
+import { createElement, useEffect, useId, useState } from "react";
+import styles from "./settings.module.dshcss";
 
 export const SETTINGS_NAMESPACE = "lamplitisles-kepos-imagegen";
 export const inject = ["settingsScope", "slots"] as const;
@@ -76,11 +78,15 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
   const [draft, setDraft] = useState(() => bridgeUrlFromSnapshot(snapshot));
   const [feedback, setFeedback] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+  const cardId = useId();
 
   useEffect(
     () => scope.subscribe(() => setSnapshot(scope.getSnapshot())),
     [scope],
   );
+  const saved = bridgeUrlFromSnapshot(snapshot);
+  const dirty = draft !== saved;
   useEffect(() => setDraft(bridgeUrlFromSnapshot(snapshot)), [snapshot]);
 
   const save = async () => {
@@ -88,7 +94,7 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
     try {
       setSaving(true);
       await saveBridgeUrl(scope, draft);
-      setFeedback("Saved.");
+      setFeedback(undefined);
     } catch {
       setFeedback("Enter a valid Kepos bridge address.");
     } finally {
@@ -97,40 +103,104 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
   };
 
   return createElement(
-    "section",
-    { "aria-labelledby": "kepos-image-settings-title" },
-    createElement(
-      "h2",
-      { id: "kepos-image-settings-title" },
-      "Kepos Image Generation",
-    ),
-    createElement(
-      "p",
-      null,
-      "The Kepos bridge appends /codex/images to this address.",
-    ),
-    createElement(
-      "label",
-      { htmlFor: "kepos-image-bridge-url" },
-      "Kepos bridge address",
-    ),
-    createElement("input", {
-      id: "kepos-image-bridge-url",
-      type: "text",
-      value: draft,
-      onChange: (event: { target: { value: string } }) =>
-        setDraft(event.target.value),
-    }),
+    "li",
+    {
+      className: `${styles.card} ${open ? styles.open : ""}`,
+      "data-settings-card": SETTINGS_NAMESPACE,
+    },
     createElement(
       "button",
-      { type: "button", onClick: () => void save(), disabled: saving },
-      saving ? "Saving…" : "Save",
+      {
+        type: "button",
+        className: styles.header,
+        "aria-expanded": open,
+        "aria-controls": `${cardId}-body`,
+        onClick: () => setOpen((value) => !value),
+      },
+      createElement(
+        "span",
+        { className: styles.headText },
+        createElement(
+          "span",
+          { className: styles.name },
+          "Kepos Image Generation",
+        ),
+        createElement(
+          "span",
+          { className: styles.description },
+          "Bridge used for generated image attachments.",
+        ),
+      ),
+      dirty
+        ? createElement("span", { className: styles.pending }, "Unsaved")
+        : null,
+      createElement(IconChevronDownOutline14, {
+        className: `${styles.chevron} ${open ? styles.chevronOpen : ""}`,
+      }),
     ),
-    feedback
+    open
       ? createElement(
-          "p",
-          { role: feedback === "Saved." ? "status" : "alert" },
-          feedback,
+          "div",
+          { className: styles.body, id: `${cardId}-body` },
+          createElement(
+            "div",
+            { className: styles.field },
+            createElement(
+              "label",
+              { className: styles.label, htmlFor: `${cardId}-bridge` },
+              "Kepos bridge address",
+            ),
+            createElement("input", {
+              className: styles.control,
+              id: `${cardId}-bridge`,
+              type: "text",
+              value: draft,
+              disabled: saving || !snapshot.writable,
+              onChange: (event: { target: { value: string } }) => {
+                setDraft(event.target.value);
+                setFeedback(undefined);
+              },
+            }),
+            createElement(
+              "p",
+              { className: styles.hint },
+              "The plugin appends /codex/images to this address.",
+            ),
+          ),
+          createElement(
+            "div",
+            { className: styles.footer },
+            feedback
+              ? createElement(
+                  "p",
+                  { className: styles.error, role: "alert" },
+                  feedback,
+                )
+              : null,
+            createElement(
+              "button",
+              {
+                className: styles.discard,
+                type: "button",
+                disabled: !dirty || saving,
+                onClick: () => {
+                  setDraft(saved);
+                  setFeedback(undefined);
+                },
+              },
+              "Discard",
+            ),
+            createElement(
+              "button",
+              {
+                className: styles.save,
+                type: "button",
+                onClick: () => void save(),
+                disabled: !dirty || saving || !snapshot.writable,
+              },
+              saving ? "Saving…" : "Save",
+            ),
+          ),
         )
       : null,
   );
