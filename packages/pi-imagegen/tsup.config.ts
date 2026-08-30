@@ -11,5 +11,5 @@ export default defineConfig({
     "@earendil-works/pi-coding-agent",
     "typebox",
   ],
-  noExternal: ["@kepos/imagegen-core"],
+  noExternal: ["@lamplitisles/imagegen-core"],
 });

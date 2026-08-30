@@ -28,11 +28,11 @@ async function fixture(): Promise<string> {
   );
   await writeFile(
     join(root, "packages/imagegen/package.json"),
-    JSON.stringify({ ...packageJson, name: "@kepos/dsh-imagegen" }),
+    JSON.stringify({ ...packageJson, name: "@lamplitisles/dsh-imagegen" }),
   );
   await writeFile(
     join(root, "packages/pi-imagegen/package.json"),
-    JSON.stringify({ ...packageJson, name: "@kepos/pi-imagegen" }),
+    JSON.stringify({ ...packageJson, name: "@lamplitisles/pi-imagegen" }),
   );
   return root;
 }
@@ -60,7 +60,7 @@ describe("release invariants", () => {
     await writeFile(
       join(root, "packages/pi-imagegen/package.json"),
       JSON.stringify({
-        name: "@kepos/pi-imagegen",
+        name: "@lamplitisles/pi-imagegen",
         version: "0.1.1",
         repository: {
           type: "git",
@@ -73,7 +73,7 @@ describe("release invariants", () => {
       }),
     );
     expect(releaseCheck(root, "v0.1.0", false)).toContain(
-      "@kepos/pi-imagegen version does not match v0.1.0.",
+      "@lamplitisles/pi-imagegen version does not match v0.1.0.",
     );
   });
 

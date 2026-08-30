@@ -1,5 +1,5 @@
 {
-  "name": "@kepos/dsh-imagegen",
+  "name": "@lamplitisles/dsh-imagegen",
   "version": "0.1.0",
   "description": "Kepos bridge image generation for DeepSeek Harness",
   "license": "Apache-2.0",

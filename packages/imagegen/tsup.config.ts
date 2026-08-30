@@ -25,7 +25,7 @@ function cssModulesPlugin(): EsbuildPlugin {
     setup(build) {
       build.onLoad({ filter: /\.module\.dshcss$/ }, async (args) => {
         const { css, classes } = await compileCssModule(args.path);
-        const styleId = "@kepos/dsh-imagegen/settings.module.css";
+        const styleId = "@lamplitisles/dsh-imagegen/settings.module.css";
         return {
           loader: "js",
           contents: [
@@ -48,7 +48,7 @@ export default defineConfig([
     dts: true,
     clean: true,
     external,
-    noExternal: ["@kepos/imagegen-core"],
+    noExternal: ["@lamplitisles/imagegen-core"],
   },
   {
     entry: { client: "src/client.ts" },
@@ -57,10 +57,10 @@ export default defineConfig([
     dts: true,
     esbuildPlugins: [cssModulesPlugin()],
     external,
-    noExternal: ["@kepos/imagegen-core"],
+    noExternal: ["@lamplitisles/imagegen-core"],
     outExtension: () => ({ js: ".js" }),
     banner: {
-      js: 'window.__ModuleLoader__.load({ id: "@kepos/dsh-imagegen", factory: (require) => { var module = { exports: {} }; var exports = module.exports;',
+      js: 'window.__ModuleLoader__.load({ id: "@lamplitisles/dsh-imagegen", factory: (require) => { var module = { exports: {} }; var exports = module.exports;',
     },
     footer: { js: "return module.exports; } });" },
   },

@@ -55,7 +55,7 @@ async function smokeDsh(): Promise<void> {
   ) as Record<string, any>;
 
   requireCondition(
-    manifest.name === "@kepos/dsh-imagegen",
+    manifest.name === "@lamplitisles/dsh-imagegen",
     "DSH package name is incorrect.",
   );
   requireCondition(
@@ -103,7 +103,7 @@ async function smokeDsh(): Promise<void> {
   );
   requireCondition(
     !(await readFile(join(packageDirectory, "dist/index.js"), "utf8")).includes(
-      "@kepos/imagegen-core",
+      "@lamplitisles/imagegen-core",
     ),
     "DSH artifact retains a runtime core import.",
   );
@@ -158,7 +158,7 @@ async function smokePi(): Promise<void> {
       private: true,
       type: "module",
       dependencies: {
-        "@kepos/pi-imagegen": `file:${archive}`,
+        "@lamplitisles/pi-imagegen": `file:${archive}`,
         "@earendil-works/pi-coding-agent": "file:./fakes/pi-coding-agent",
         "@earendil-works/pi-ai": "file:./fakes/pi-ai",
         typebox: "file:./fakes/typebox",
@@ -171,7 +171,10 @@ async function smokePi(): Promise<void> {
     directory,
   );
 
-  const packageDirectory = join(directory, "node_modules/@kepos/pi-imagegen");
+  const packageDirectory = join(
+    directory,
+    "node_modules/@lamplitisles/pi-imagegen",
+  );
   const manifest = JSON.parse(
     await readFile(join(packageDirectory, "package.json"), "utf8"),
   ) as Record<string, any>;
@@ -199,7 +202,7 @@ async function smokePi(): Promise<void> {
   );
   requireCondition(
     !(await readFile(join(packageDirectory, "dist/index.js"), "utf8")).includes(
-      "@kepos/imagegen-core",
+      "@lamplitisles/imagegen-core",
     ),
     "Pi artifact retains a runtime core import.",
   );

@@ -1,7 +1,7 @@
 import {
   DEFAULT_BRIDGE_URL,
   MAX_BRIDGE_JSON_BYTES,
-} from "@kepos/imagegen-core";
+} from "@lamplitisles/imagegen-core";
 import { Context, Service } from "@deepseek-ai/cordis";
 import { SettingsProvider, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import {
