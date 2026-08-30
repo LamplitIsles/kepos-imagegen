@@ -30,15 +30,17 @@ current address and explains that interactive UI is required. Pi stores only
 Both adapters expose `kepos_image_generate`. Omit `images` to generate a PNG.
 For an edit, pass one through five PNG, JPEG, GIF, or WebP paths relative to the
 active DSH workspace or Pi current working directory. Paths outside that
-directory, including symlink escapes, are rejected. Results are native DSH
-attachments or Pi image content blocks; no output file is written.
+directory, including symlink escapes, are rejected. DSH also saves each result
+as a PNG under `.dsh/kepos-imagegen/` and returns that relative path alongside
+its native attachment. Pi returns an image content block and does not write an
+output file.
 
 ## Maintainer release setup
 
 The GitHub workflow publishes a matching tagged release of the two public
 packages. Before the first beta publication, a maintainer must:
 
-1. Create the `@kepos` npm scope and manually publish the initial beta for both
+1. Create the `@lamplitisles` npm scope and manually publish the initial beta for both
    `@lamplitisles/dsh-imagegen` and `@lamplitisles/pi-imagegen`.
 2. Configure npm Trusted Publishing for each package identity, this repository,
    the `.github/workflows/release.yml` workflow, and the protected `npm`

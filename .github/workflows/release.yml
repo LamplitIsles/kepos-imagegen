@@ -41,10 +41,10 @@ jobs:
         with:
           name: verified-public-packages
           path: |
-            packages/imagegen/dist
-            packages/imagegen/package.json
-            packages/imagegen/cordis.patch.yml
-            packages/imagegen/README.md
+            packages/dsh-imagegen/dist
+            packages/dsh-imagegen/package.json
+            packages/dsh-imagegen/cordis.patch.yml
+            packages/dsh-imagegen/README.md
             packages/pi-imagegen/dist
             packages/pi-imagegen/package.json
             packages/pi-imagegen/README.md
@@ -59,13 +59,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [imagegen, pi-imagegen]
+        package: [dsh-imagegen, pi-imagegen]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
       - run: npm install --global npm@">=11.10.0"
       - uses: actions/download-artifact@v4
         with:
@@ -77,7 +78,7 @@ jobs:
           PACKAGE: ${{ matrix.package }}
         run: |
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
-            npm publish "packages/$PACKAGE" --no-git-checks --access public --provenance --tag beta
+            npm publish "./packages/$PACKAGE" --access public --provenance --tag beta
           else
-            npm publish "packages/$PACKAGE" --no-git-checks --access public --provenance --tag latest
+            npm publish "./packages/$PACKAGE" --access public --provenance --tag latest
           fi

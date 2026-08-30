@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:core": "vitest run packages/imagegen-core/test",
-    "test:dsh": "vitest run packages/imagegen/test",
+    "test:dsh": "vitest run packages/dsh-imagegen/test",
     "test:pi": "vitest run packages/pi-imagegen/test",
     "test:pack": "tsx scripts/pack-smoke.ts",
     "format": "prettier --write . --ignore-unknown",

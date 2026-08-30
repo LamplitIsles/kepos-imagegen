@@ -13,11 +13,13 @@ const external = [
   "@deepseek-ai/dsh-client-ui-settings",
   "@deepseek-ai/dsh-client-ui-settings-plugins",
   "@deepseek-ai/dsh-client-ui-slots",
+  "@deepseek-ai/dsh-client-ui-tool",
   "@deepseek-ai/dsh-fs",
   "@deepseek-ai/dsh-settings",
   "@deepseek-ai/dsh-tools",
   "@deepseek-ai/schemastery",
   "react",
+  "react-dom",
 ];
 function cssModulesPlugin(): EsbuildPlugin {
   return {
@@ -54,6 +56,7 @@ export default defineConfig([
     entry: { client: "src/client.ts" },
     format: ["cjs"],
     platform: "browser",
+    loader: { ".css": "text" },
     dts: true,
     esbuildPlugins: [cssModulesPlugin()],
     external,

@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { releaseCheck } from "../../../scripts/release-check.js";
-import { npmDistTag, versionFromTag } from "../../../scripts/release-shared.js";
+import {
+  npmDistTag,
+  packedFilePaths,
+  packedManifest,
+  versionFromTag,
+} from "../../../scripts/release-shared.js";
 import { synchronizeReleaseVersions } from "../../../scripts/sync-release-version.js";
 
 const fixtures: string[] = [];
@@ -15,19 +20,19 @@ async function fixture(): Promise<string> {
     version: "0.1.0",
     repository: {
       type: "git",
-      url: "https://github.com/lamplitisles/kepos-imagegen.git",
+      url: "https://github.com/LamplitIsles/kepos-imagegen.git",
     },
     publishConfig: { registry: "https://registry.npmjs.org", access: "public" },
   };
   await mkdir(join(root, "packages/imagegen-core"), { recursive: true });
-  await mkdir(join(root, "packages/imagegen"), { recursive: true });
+  await mkdir(join(root, "packages/dsh-imagegen"), { recursive: true });
   await mkdir(join(root, "packages/pi-imagegen"), { recursive: true });
   await writeFile(
     join(root, "packages/imagegen-core/package.json"),
     JSON.stringify({ private: true }),
   );
   await writeFile(
-    join(root, "packages/imagegen/package.json"),
+    join(root, "packages/dsh-imagegen/package.json"),
     JSON.stringify({ ...packageJson, name: "@lamplitisles/dsh-imagegen" }),
   );
   await writeFile(
@@ -46,6 +51,21 @@ afterEach(async () => {
 });
 
 describe("release invariants", () => {
+  it("reads npm 12 packed-manifest output", () => {
+    const packed = {
+      "@lamplitisles/dsh-imagegen": {
+        filename: "lamplitisles-dsh-imagegen-0.1.0.tgz",
+        files: [{ path: "dist/index.js" }, { path: "cordis.patch.yml" }],
+      },
+    } as unknown as Parameters<typeof packedFilePaths>[0];
+    const files = packedFilePaths(packed);
+
+    expect(files).toEqual(new Set(["dist/index.js", "cordis.patch.yml"]));
+    expect(packedManifest(packed)?.filename).toBe(
+      "lamplitisles-dsh-imagegen-0.1.0.tgz",
+    );
+  });
+
   it("accepts matching stable and prerelease tags and chooses their npm channels", async () => {
     const root = await fixture();
     expect(releaseCheck(root, "v0.1.0", false)).toEqual([]);
@@ -64,7 +84,7 @@ describe("release invariants", () => {
         version: "0.1.1",
         repository: {
           type: "git",
-          url: "https://github.com/lamplitisles/kepos-imagegen.git",
+          url: "https://github.com/LamplitIsles/kepos-imagegen.git",
         },
         publishConfig: {
           registry: "https://registry.npmjs.org",
@@ -80,7 +100,7 @@ describe("release invariants", () => {
   it("synchronizes both public package versions from a prerelease tag", async () => {
     const root = await fixture();
     await synchronizeReleaseVersions(root, "v0.1.0-beta.1");
-    for (const directory of ["imagegen", "pi-imagegen"]) {
+    for (const directory of ["dsh-imagegen", "pi-imagegen"]) {
       const manifest = JSON.parse(
         await readFile(
           join(root, `packages/${directory}/package.json`),

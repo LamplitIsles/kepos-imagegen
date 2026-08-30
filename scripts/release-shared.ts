@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 export const PUBLIC_PACKAGES = [
   {
-    directory: "imagegen",
+    directory: "dsh-imagegen",
     name: "@lamplitisles/dsh-imagegen",
     requiredFiles: [
       "dist/index.js",
@@ -42,10 +42,31 @@ export function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
 }
 
+type PackedPackage = {
+  filename?: string;
+  files?: Array<{ path?: string }>;
+};
+
+export type PackedManifest = PackedPackage[] | Record<string, PackedPackage>;
+
+export function packedManifest(
+  packed: PackedManifest,
+): PackedPackage | undefined {
+  return Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
+}
+
+export function packedFilePaths(packed: PackedManifest): Set<string> {
+  const manifest = packedManifest(packed);
+  const paths = manifest?.files?.flatMap((file) =>
+    file.path === undefined ? [] : [file.path],
+  );
+  return new Set(paths);
+}
+
 export function checkReleaseManifests(root: string, tag: string): string[] {
   const errors: string[] = [];
   const version = versionFromTag(tag);
-  const repository = "https://github.com/lamplitisles/kepos-imagegen.git";
+  const repository = "https://github.com/LamplitIsles/kepos-imagegen.git";
   const core = readJson(join(root, "packages/imagegen-core/package.json"));
   if (core.private !== true) {
     errors.push("@lamplitisles/imagegen-core must remain private.");
@@ -101,7 +122,7 @@ export function checkPackedManifests(root: string): string[] {
       errors.push(`${entry.name} is not built before release preflight.`);
       continue;
     }
-    let packed: Array<{ files?: Array<{ path?: string }> }>;
+    let packed: PackedManifest;
     try {
       packed = JSON.parse(
         execFileSync("npm", ["pack", "--json", "--dry-run"], {
@@ -109,12 +130,12 @@ export function checkPackedManifests(root: string): string[] {
           encoding: "utf8",
           stdio: ["ignore", "pipe", "pipe"],
         }),
-      ) as Array<{ files?: Array<{ path?: string }> }>;
+      ) as PackedManifest;
     } catch {
       errors.push(`${entry.name} could not produce a packed manifest.`);
       continue;
     }
-    const files = new Set(packed[0]?.files?.map((file) => file.path) ?? []);
+    const files = packedFilePaths(packed);
     for (const required of entry.requiredFiles) {
       if (!files.has(required))
         errors.push(`${entry.name} packed manifest omits ${required}.`);

@@ -1,5 +1,5 @@
 import { defineConfig } from "vitest/config";
-import { compileCssModule } from "./packages/imagegen/scripts/css-modules.js";
+import { compileCssModule } from "./packages/dsh-imagegen/scripts/css-modules.js";
 
 export default defineConfig({
   plugins: [
