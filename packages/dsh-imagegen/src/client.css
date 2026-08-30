@@ -1,5 +1,4 @@
-.kepos-imagegen__card,
-.kepos-imagegen__settings {
+.kepos-imagegen__card {
   display: grid;
   gap: 12px;
   max-width: 480px;
@@ -15,8 +14,7 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-.kepos-imagegen__status,
-.kepos-imagegen__settings-title {
+.kepos-imagegen__status {
   margin: 0;
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
@@ -39,7 +37,6 @@
 
 .kepos-imagegen__thumbnail:focus-visible,
 .kepos-imagegen__button:focus-visible,
-.kepos-imagegen__input:focus-visible,
 .kepos-imagegen__close:focus-visible {
   outline: 2px solid var(--dsw-alias-interactive-border-focus);
   outline-offset: 2px;
@@ -127,40 +124,6 @@
   right: 20px;
   padding: 6px 10px;
   font: inherit;
-}
-
-.kepos-imagegen__settings-copy,
-.kepos-imagegen__feedback {
-  margin: 0;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.kepos-imagegen__label {
-  color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
-.kepos-imagegen__input {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  background: var(--dsw-specific-input-major);
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
-}
-
-.kepos-imagegen__feedback[data-state="success"] {
-  color: var(--dsw-alias-state-success-primary);
-}
-
-.kepos-imagegen__feedback[data-state="error"] {
-  color: var(--dsw-alias-state-error-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {

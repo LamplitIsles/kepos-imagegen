@@ -79,16 +79,16 @@ async function smokeDsh(): Promise<void> {
     "DSH host injection contract is missing from the packed artifact.",
   );
   requireCondition(
-    manifest.peerDependencies?.["@deepseek-ai/dsh-tools"] === "0.1.0-rc.8",
-    "DSH rc.8 peer is incorrect.",
+    manifest.peerDependencies?.["@deepseek-ai/dsh-tools"] === "0.1.1-rc.2",
+    "DSH 0.1.1 peer is incorrect.",
   );
   requireCondition(
-    manifest.peerDependencies?.["@deepseek-ai/dsh-attachment"] === "0.1.0-rc.8",
+    manifest.peerDependencies?.["@deepseek-ai/dsh-attachment"] === "0.1.1-rc.2",
     "DSH attachment peer is incorrect.",
   );
   requireCondition(
     manifest.peerDependencies?.["@deepseek-ai/dsh-client-runtime"] ===
-      "0.1.0-rc.8",
+      "0.1.1-rc.2",
     "DSH client peer is incorrect.",
   );
   requireCondition(
