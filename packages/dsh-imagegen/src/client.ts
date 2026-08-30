@@ -66,6 +66,21 @@ export function bridgeUrlFromSnapshot(
   return validOrDefault(snapshot.value?.bridgeUrl);
 }
 
+export interface BridgeUrlDraft {
+  value: string;
+  saved: string;
+}
+
+export function syncBridgeUrlDraft(
+  draft: BridgeUrlDraft,
+  saved: string,
+): BridgeUrlDraft {
+  if (draft.saved === saved) return draft;
+  return draft.value === draft.saved
+    ? { value: saved, saved }
+    : { value: draft.value, saved };
+}
+
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => installStyles(cssText), "kepos-imagegen: styles");
   const scope = ctx.settingsScope.bind({
@@ -273,7 +288,11 @@ function isToolResult(
 
 function SettingsCard({ scope }: { scope: SettingsScope }) {
   const [snapshot, setSnapshot] = useState(() => scope.getSnapshot());
-  const [draft, setDraft] = useState(() => bridgeUrlFromSnapshot(snapshot));
+  const initialBridgeUrl = bridgeUrlFromSnapshot(snapshot);
+  const [draft, setDraft] = useState<BridgeUrlDraft>(() => ({
+    value: initialBridgeUrl,
+    saved: initialBridgeUrl,
+  }));
   const [feedback, setFeedback] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
@@ -284,14 +303,18 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
     [scope],
   );
   const saved = bridgeUrlFromSnapshot(snapshot);
-  const dirty = draft !== saved;
-  useEffect(() => setDraft(bridgeUrlFromSnapshot(snapshot)), [snapshot]);
+  const dirty = draft.value !== draft.saved;
+  useEffect(
+    () => setDraft((current) => syncBridgeUrlDraft(current, saved)),
+    [saved],
+  );
 
   const save = async () => {
     setFeedback(undefined);
     try {
       setSaving(true);
-      await saveBridgeUrl(scope, draft);
+      const bridgeUrl = await saveBridgeUrl(scope, draft.value);
+      setDraft({ value: bridgeUrl, saved: bridgeUrl });
       setFeedback(undefined);
     } catch {
       setFeedback("Enter a valid Kepos bridge address.");
@@ -299,6 +322,8 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
       setSaving(false);
     }
   };
+
+  if (snapshot.status !== "ready") return null;
 
   return createElement(
     "li",
@@ -340,6 +365,13 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
       ? createElement(
           "div",
           { className: styles.body, id: `${cardId}-body` },
+          !snapshot.writable
+            ? createElement(
+                "p",
+                { className: styles.readOnly, role: "status" },
+                "This deployment is read-only.",
+              )
+            : null,
           createElement(
             "div",
             { className: styles.field },
@@ -352,16 +384,20 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
               className: styles.control,
               id: `${cardId}-bridge`,
               type: "text",
-              value: draft,
+              value: draft.value,
+              "aria-describedby": `${cardId}-bridge-hint`,
               disabled: saving || !snapshot.writable,
               onChange: (event: { target: { value: string } }) => {
-                setDraft(event.target.value);
+                setDraft((current) => ({
+                  ...current,
+                  value: event.target.value,
+                }));
                 setFeedback(undefined);
               },
             }),
             createElement(
               "p",
-              { className: styles.hint },
+              { className: styles.hint, id: `${cardId}-bridge-hint` },
               "The plugin appends /codex/images to this address.",
             ),
           ),
@@ -382,7 +418,7 @@ function SettingsCard({ scope }: { scope: SettingsScope }) {
                 type: "button",
                 disabled: !dirty || saving,
                 onClick: () => {
-                  setDraft(saved);
+                  setDraft({ value: saved, saved });
                   setFeedback(undefined);
                 },
               },

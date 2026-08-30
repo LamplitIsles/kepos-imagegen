@@ -27,6 +27,7 @@ import {
   bridgeUrlFromSnapshot,
   decodeSettings,
   saveBridgeUrl,
+  syncBridgeUrlDraft,
 } from "../src/client.js";
 
 const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
@@ -460,6 +461,31 @@ describe("DSH image adapter", () => {
     });
     expect(decodeSettings({ bridgeUrl: "unsafe/path" })).toEqual({
       bridgeUrl: DEFAULT_BRIDGE_URL,
+    });
+  });
+
+  it("keeps a staged bridge URL across failed or conflicting snapshot reloads", () => {
+    const edited = {
+      value: "https://draft.example",
+      saved: "https://saved.example",
+    };
+
+    expect(syncBridgeUrlDraft(edited, "https://saved.example")).toBe(edited);
+    expect(syncBridgeUrlDraft(edited, "https://other.example")).toEqual({
+      value: "https://draft.example",
+      saved: "https://other.example",
+    });
+    expect(
+      syncBridgeUrlDraft(
+        {
+          value: "https://saved.example",
+          saved: "https://saved.example",
+        },
+        "https://other.example",
+      ),
+    ).toEqual({
+      value: "https://other.example",
+      saved: "https://other.example",
     });
   });
 });

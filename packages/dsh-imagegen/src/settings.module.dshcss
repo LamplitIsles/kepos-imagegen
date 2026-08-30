@@ -74,6 +74,12 @@
   padding-bottom: 8px;
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
+.readOnly {
+  margin: 12px 0 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .field {
   display: flex;
   flex-direction: column;
@@ -138,6 +144,10 @@
   background: transparent;
   color: var(--dsw-alias-label-secondary);
 }
+.discard:hover:not(:disabled) {
+  border-color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-primary);
+}
 .save {
   background: var(--dsw-alias-label-primary);
   color: var(--dsw-alias-bg-layer-3);
@@ -146,6 +156,11 @@
 .save:disabled {
   opacity: 0.4;
   cursor: default;
+}
+.discard:focus-visible,
+.save:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
 }
 @media (prefers-reduced-motion: reduce) {
   .card,
