@@ -3,7 +3,7 @@ import {
   MAX_BRIDGE_JSON_BYTES,
 } from "@lamplitisles/imagegen-core";
 import { Context, Service } from "@deepseek-ai/cordis";
-import { SettingsProvider, settingsNamespace } from "@deepseek-ai/dsh-settings";
+import { SettingsProvider } from "@deepseek-ai/dsh-settings";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -148,7 +148,7 @@ describe("DSH image adapter", () => {
         tools: { register() {} },
       } as any);
 
-      expect(settings.get(settingsNamespace(SETTINGS_NAMESPACE))).toEqual({
+      expect(settings.get(SETTINGS_NAMESPACE)).toEqual({
         bridgeUrl: DEFAULT_BRIDGE_URL,
       });
       expect(validOrDefault("unsafe/path")).toBe(DEFAULT_BRIDGE_URL);

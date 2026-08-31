@@ -2,12 +2,18 @@ import {
   DEFAULT_BRIDGE_URL,
   normalizeBridgeUrl,
 } from "@lamplitisles/imagegen-core";
+import type { Context as ClientContext } from "@deepseek-ai/cordis";
+import type {
+  ISession,
+  ISessions,
+} from "@deepseek-ai/dsh-api-session-controller/client";
 import type {
   SettingsScope as DshSettingsScope,
   SettingsScopeSnapshot,
-  SettingsScopeSpec,
-} from "@deepseek-ai/dsh-client-runtime/client";
-import type { ISessions } from "@deepseek-ai/dsh-client-runtime/client";
+} from "@deepseek-ai/dsh-client-ui-settings/client";
+import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
+import type {} from "@deepseek-ai/dsh-client-ui-session/client";
+import type {} from "@deepseek-ai/dsh-client-ui-settings-plugins/client";
 import type { ImageAttachmentRef } from "@deepseek-ai/dsh-attachment";
 import { IconChevronDownOutline14 } from "@deepseek-ai/dsh-client-ui-primitives";
 import type { ToolCallViewProps } from "@deepseek-ai/dsh-client-ui-tool/client";
@@ -27,21 +33,6 @@ export type SettingsScope = Pick<
   DshSettingsScope<ClientSettings>,
   "getSnapshot" | "subscribe" | "set"
 >;
-
-type ClientContext = {
-  sessions: Pick<ISessions, "binding">;
-  settingsScope: {
-    bind(spec: SettingsScopeSpec<ClientSettings>): SettingsScope;
-  };
-  slots: {
-    inject(name: string, callback: () => unknown): void;
-    register(
-      spec: { name: string; key: string; inject: () => object },
-      content: unknown,
-    ): unknown;
-  };
-  effect(callback: () => void | (() => void), name?: string): void;
-};
 
 export function decodeSettings(value: unknown): ClientSettings {
   if (typeof value !== "object" || value === null) {
@@ -92,7 +83,6 @@ export function apply(ctx: ClientContext): void {
       {
         name: "settings.plugin.item",
         key: SETTINGS_NAMESPACE,
-        inject: () => ({}),
       },
       () => createElement(SettingsCard, { scope }),
     ),
@@ -102,7 +92,6 @@ export function apply(ctx: ClientContext): void {
       {
         name: "tool.call.toolview",
         key: "kepos_image_generate",
-        inject: () => ({}),
       },
       (props: ToolCallViewProps) =>
         createElement(ImageToolCard, { ...props, sessions: ctx.sessions }),
@@ -128,18 +117,20 @@ function ImageToolCard({ block, sessionId, sessions }: ImageToolCardProps) {
     let objectUrl: string | undefined;
     setSrc(undefined);
     setLoadFailed(false);
-    session.readAttachment(attachment.attachmentId).then((result) => {
-      if (!result.ok || !live) {
-        if (live) setLoadFailed(true);
-        return;
-      }
-      objectUrl = URL.createObjectURL(
-        new Blob([new Uint8Array(result.value.data)], {
-          type: result.value.attachment.mediaType,
-        }),
-      );
-      setSrc(objectUrl);
-    });
+    session
+      .readAttachment(attachment.attachmentId)
+      .then((result: Awaited<ReturnType<ISession["readAttachment"]>>) => {
+        if (!result.ok || !live) {
+          if (live) setLoadFailed(true);
+          return;
+        }
+        objectUrl = URL.createObjectURL(
+          new Blob([new Uint8Array(result.value.data)], {
+            type: result.value.attachment.mediaType,
+          }),
+        );
+        setSrc(objectUrl);
+      });
     return () => {
       live = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
