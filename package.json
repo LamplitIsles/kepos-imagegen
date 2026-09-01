@@ -21,7 +21,6 @@
     "release:check": "tsx scripts/release-check.ts"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh": "0.1.2-alpha.3",
     "@types/node": "^24.10.0",
     "esbuild": "0.25.12",
     "lightningcss": "^1.33.0",
