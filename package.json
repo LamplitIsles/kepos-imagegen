@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:core": "vitest run packages/imagegen-core/test",
     "test:dsh": "vitest run packages/dsh-imagegen/test",
+    "test:dsh-link": "tsx scripts/dsh-link-smoke.ts",
     "test:pi": "vitest run packages/pi-imagegen/test",
     "test:pack": "tsx scripts/pack-smoke.ts",
     "format": "prettier --write . --ignore-unknown",

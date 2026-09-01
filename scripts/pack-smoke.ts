@@ -4,10 +4,41 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { runInNewContext } from "node:vm";
 import { packedManifest, type PackedManifest } from "./release-shared.js";
 
 const root = resolve(import.meta.dirname, "..");
 const temporaryDirectories: string[] = [];
+const DSH_ALPHA_VERSION = "0.1.2-alpha.3";
+const DSH_CLIENT_INJECT = [
+  "@deepseek-ai/dsh-api-remotes",
+  "@deepseek-ai/dsh-api-session-controller",
+  "@deepseek-ai/dsh-client-connection",
+  "@deepseek-ai/dsh-client-locale",
+  "@deepseek-ai/dsh-client-ui-primitives",
+  "@deepseek-ai/dsh-client-ui-renderer",
+  "@deepseek-ai/dsh-client-ui-session",
+  "@deepseek-ai/dsh-client-ui-tool",
+  "@deepseek-ai/dsh-client-ui-settings",
+  "@deepseek-ai/dsh-client-ui-settings-plugins",
+] as const;
+const DSH_EXTERNAL_PEERS = [
+  "@deepseek-ai/dsh-api-remotes",
+  "@deepseek-ai/dsh-api-session-controller",
+  "@deepseek-ai/dsh-attachment",
+  "@deepseek-ai/dsh-client-connection",
+  "@deepseek-ai/dsh-client-locale",
+  "@deepseek-ai/dsh-client-ui-primitives",
+  "@deepseek-ai/dsh-client-ui-renderer",
+  "@deepseek-ai/dsh-client-ui-session",
+  "@deepseek-ai/dsh-client-ui-settings",
+  "@deepseek-ai/dsh-client-ui-settings-plugins",
+  "@deepseek-ai/dsh-client-ui-slots",
+  "@deepseek-ai/dsh-client-ui-tool",
+  "@deepseek-ai/dsh-fs",
+  "@deepseek-ai/dsh-settings",
+  "@deepseek-ai/dsh-tools",
+] as const;
 
 function requireCondition(
   condition: unknown,
@@ -16,11 +47,17 @@ function requireCondition(
   if (!condition) throw new Error(message);
 }
 
-function run(command: string, args: string[], cwd: string): string {
+function run(
+  command: string,
+  args: string[],
+  cwd: string,
+  options: { env?: NodeJS.ProcessEnv; timeout?: number } = {},
+): string {
   return execFileSync(command, args, {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    ...options,
   });
 }
 
@@ -73,23 +110,52 @@ async function smokeDsh(): Promise<void> {
     "DSH client declaration is missing from the packed artifact.",
   );
   requireCondition(
+    manifest.dsh?.bundle?.patch === "./cordis.patch.yml",
+    "DSH bundle patch declaration is missing from the packed artifact.",
+  );
+  requireCondition(
+    manifest.dsh?.client?.platform === "web",
+    "DSH browser client platform declaration is incorrect.",
+  );
+  requireCondition(
     (
       await readFile(join(packageDirectory, "cordis.patch.yml"), "utf8")
     ).includes("inject: [attachments, fs, settings, tools]"),
     "DSH host injection contract is missing from the packed artifact.",
   );
   requireCondition(
-    manifest.peerDependencies?.["@deepseek-ai/dsh-tools"] === "0.1.1-rc.2",
-    "DSH 0.1.1 peer is incorrect.",
+    JSON.stringify(manifest.dsh?.client?.inject) ===
+      JSON.stringify(DSH_CLIENT_INJECT),
+    "DSH client injection contract is incorrect.",
+  );
+  for (const peer of DSH_EXTERNAL_PEERS) {
+    requireCondition(
+      manifest.peerDependencies?.[peer] === DSH_ALPHA_VERSION,
+      `DSH peer ${peer} is not pinned to ${DSH_ALPHA_VERSION}.`,
+    );
+  }
+  requireCondition(
+    manifest.peerDependencies?.["@deepseek-ai/cordis"] === "4.0.2" &&
+      manifest.peerDependencies?.["@deepseek-ai/schemastery"] === "3.18.2",
+    "DSH framework peers are not pinned to the alpha-compatible versions.",
+  );
+  for (const [dependency, version] of Object.entries(
+    manifest.devDependencies ?? {},
+  )) {
+    if (dependency.startsWith("@deepseek-ai/dsh-")) {
+      requireCondition(
+        version === DSH_ALPHA_VERSION,
+        `DSH development dependency ${dependency} is not pinned to ${DSH_ALPHA_VERSION}.`,
+      );
+    }
+  }
+  requireCondition(
+    !("@deepseek-ai/dsh-client-runtime" in (manifest.peerDependencies ?? {})),
+    "DSH artifact retains the retired client Runtime peer.",
   );
   requireCondition(
-    manifest.peerDependencies?.["@deepseek-ai/dsh-attachment"] === "0.1.1-rc.2",
-    "DSH attachment peer is incorrect.",
-  );
-  requireCondition(
-    manifest.peerDependencies?.["@deepseek-ai/dsh-client-runtime"] ===
-      "0.1.1-rc.2",
-    "DSH client peer is incorrect.",
+    !("@deepseek-ai/dsh-client-runtime" in (manifest.devDependencies ?? {})),
+    "DSH artifact retains the retired client Runtime development dependency.",
   );
   requireCondition(
     manifest.dependencies === undefined,
@@ -115,6 +181,46 @@ async function smokeDsh(): Promise<void> {
         file.includes("node_modules") || /(?:playwright|chromium)/i.test(file),
     ),
     "DSH artifact contains an undeclared browser payload.",
+  );
+
+  await smokeDshClientLoader(packageDirectory);
+}
+
+async function smokeDshClientLoader(packageDirectory: string): Promise<void> {
+  let loaded:
+    | {
+        id?: string;
+        factory?: (require: (specifier: string) => unknown) => unknown;
+      }
+    | undefined;
+  type LoaderEntry = NonNullable<typeof loaded>;
+  type LoaderWindow = {
+    __ModuleLoader__: { load(entry: LoaderEntry): void };
+  };
+  const loaderWindow: LoaderWindow = {
+    __ModuleLoader__: {
+      load(entry: LoaderEntry) {
+        loaded = entry;
+      },
+    },
+  };
+  const source = await readFile(
+    join(packageDirectory, "dist/client.js"),
+    "utf8",
+  );
+  runInNewContext(source, {
+    globalThis: loaderWindow,
+    window: loaderWindow,
+    TextEncoder,
+    TextDecoder,
+  });
+  requireCondition(
+    loaded?.id === "@lamplitisles/dsh-imagegen",
+    "Packed DSH client did not register with the loader.",
+  );
+  requireCondition(
+    typeof loaded?.factory === "function",
+    "Packed DSH client loader entry has no factory.",
   );
 }
 
