@@ -2,7 +2,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { ISessions } from "@deepseek-ai/dsh-api-session-controller/client";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apply } from "../src/client.js";
+import { apply, SETTINGS_NAMESPACE } from "../src/client.js";
 
 const imageAttachment = {
   attachmentId: "attachment-1",
@@ -104,6 +104,52 @@ afterEach(() => {
 });
 
 describe("DSH durable image preview", () => {
+  it("registers the native settings card and image tool view", () => {
+    const registrations: Array<{ name: string; key: string }> = [];
+    let namespace: string | undefined;
+    const scope = {
+      getSnapshot: () => ({
+        status: "ready" as const,
+        value: { bridgeUrl: "https://bridge.invalid" },
+        base: {},
+        user: {},
+        revision: 1,
+        writable: true,
+        mode: "host" as const,
+      }),
+      subscribe: () => () => undefined,
+      set: async () => undefined,
+    };
+
+    apply({
+      effect() {},
+      settingsScope: {
+        bind(spec: { namespace?: string }) {
+          namespace = spec.namespace;
+          return scope;
+        },
+      },
+      sessions: { binding: () => undefined },
+      slots: {
+        inject(_name: string, callback: () => unknown) {
+          callback();
+        },
+        register(spec: { name: string; key: string }) {
+          registrations.push(spec);
+          return () => undefined;
+        },
+      },
+    } as unknown as Context);
+
+    expect(namespace).toBe(SETTINGS_NAMESPACE);
+    expect(registrations).toEqual(
+      expect.arrayContaining([
+        { name: "settings.plugin.item", key: SETTINGS_NAMESPACE },
+        { name: "tool.call.toolview", key: "kepos_image_generate" },
+      ]),
+    );
+  });
+
   it("constructs a preview from the alpha session attachment and revokes it on unmount", async () => {
     const readAttachment = vi.fn(async () => ({
       ok: true as const,

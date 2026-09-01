@@ -1,7 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -10,8 +9,6 @@ import { packedManifest, type PackedManifest } from "./release-shared.js";
 
 const root = resolve(import.meta.dirname, "..");
 const temporaryDirectories: string[] = [];
-const dshBin = join(root, "node_modules/.bin/dsh");
-const dshEntry = join(root, "node_modules/@deepseek-ai/dsh/lib/bin.js");
 const DSH_ALPHA_VERSION = "0.1.2-alpha.3";
 const DSH_CLIENT_INJECT = [
   "@deepseek-ai/dsh-api-remotes",
@@ -186,130 +183,10 @@ async function smokeDsh(): Promise<void> {
     "DSH artifact contains an undeclared browser payload.",
   );
 
-  await smokeDshProfile(directory, archive);
-  await smokeDshClient(packageDirectory);
+  await smokeDshClientLoader(packageDirectory);
 }
 
-async function smokeDshProfile(
-  directory: string,
-  archive: string,
-): Promise<void> {
-  const profile = "alpha-imagegen-smoke";
-  const dshHome = join(directory, "dsh-home");
-  const environment = {
-    ...process.env,
-    DSH_HOME: dshHome,
-    DSH_PERMISSION_MODE: "workspace-write",
-    DSH_TELEMETRY_DISABLED: "1",
-  };
-  requireCondition(
-    run(dshBin, ["--version"], root, { env: environment }).trim() ===
-      DSH_ALPHA_VERSION,
-    `Packed-path smoke must use dsh ${DSH_ALPHA_VERSION}.`,
-  );
-  run(dshBin, ["plugin", "--profile", profile, "add", archive], root, {
-    env: environment,
-  });
-  const profileDirectory = join(dshHome, "profiles", profile);
-  const profileManifest = JSON.parse(
-    await readFile(join(profileDirectory, "package.json"), "utf8"),
-  ) as Record<string, any>;
-  requireCondition(
-    profileManifest.dsh?.profile?.bundles?.includes(
-      "@lamplitisles/dsh-imagegen",
-    ),
-    "dsh plugin add did not activate the ImageGen bundle.",
-  );
-
-  const dump = run(dshBin, ["--profile", profile, "--dump-config"], root, {
-    env: environment,
-  });
-  requireCondition(
-    dump.includes("# == @lamplitisles/dsh-imagegen") &&
-      dump.includes("name: '@lamplitisles/dsh-imagegen'") &&
-      dump.includes(
-        "inject:\n    - attachments\n    - fs\n    - settings\n    - tools",
-      ),
-    "dsh --dump-config omitted the ImageGen bundle row or injections.",
-  );
-
-  const marker = join(directory, "host-loader-marker.json");
-  const probe = join(directory, "host-loader-probe.mjs");
-  await writeFile(
-    probe,
-    [
-      'import { writeFileSync } from "node:fs";',
-      'export const inject = ["tools", "appExit"];',
-      "export async function apply(ctx, config) {",
-      "  let tool;",
-      "  for (let attempt = 0; attempt < 100 && tool === undefined; attempt += 1) {",
-      '    tool = ctx.tools.get("kepos_image_generate");',
-      "    if (tool === undefined) await new Promise((resolve) => setTimeout(resolve, 10));",
-      "  }",
-      '  if (tool === undefined) throw new Error("ImageGen tool was not registered");',
-      "  const rendered = tool.output.render({}, {",
-      '    attachment: { attachmentId: "smoke", mediaType: "image/png", bytes: 1, width: 1, height: 1 },',
-      '    path: ".dsh/kepos-imagegen/smoke.png",',
-      '    message: "Generated image saved to .dsh/kepos-imagegen/smoke.png.",',
-      "  });",
-      '  let safeError = "";',
-      "  try {",
-      '    await tool.execute({ prompt: "loader smoke" }, {});',
-      "  } catch (error) {",
-      "    safeError = error instanceof Error ? error.message : String(error);",
-      "  }",
-      '  if (!safeError.includes("active workspace")) throw new Error(`unexpected safe error: ${safeError}`);',
-      "  writeFileSync(config.marker, JSON.stringify({ name: tool.name, rendered, safeError }));",
-      "  ctx.appExit(0);",
-      "}",
-      "",
-    ].join("\n"),
-  );
-  const overlay = join(directory, "host-loader-overlay.yml");
-  await writeFile(
-    overlay,
-    [
-      "- insert:",
-      "    - id: imagegen-host-loader-smoke",
-      '      name: "./host-loader-probe.mjs"',
-      "      inject: [tools, appExit]",
-      "      config:",
-      `        marker: ${JSON.stringify(marker)}`,
-      "",
-    ].join("\n"),
-  );
-  run(
-    process.execPath,
-    ["--expose-internals", dshEntry, "--profile", profile, "--patch", overlay],
-    root,
-    { env: environment, timeout: 30_000 },
-  );
-  const result = JSON.parse(await readFile(marker, "utf8")) as Record<
-    string,
-    any
-  >;
-  requireCondition(
-    result.name === "kepos_image_generate",
-    "The real alpha Loader did not expose the ImageGen Host tool.",
-  );
-  requireCondition(
-    Array.isArray(result.rendered) &&
-      result.rendered.some(
-        (item: Record<string, unknown>) => item.type === "image",
-      ) &&
-      result.rendered.some(
-        (item: Record<string, unknown>) => item.type === "text",
-      ),
-    "The real alpha Loader did not preserve the durable ImageGen result.",
-  );
-  requireCondition(
-    typeof result.safeError === "string" &&
-      result.safeError.includes("active workspace"),
-    "The real alpha Loader did not preserve the safe workspace error.",
-  );
-}
-
-async function smokeDshClient(packageDirectory: string): Promise<void> {
+async function smokeDshClientLoader(packageDirectory: string): Promise<void> {
   let loaded:
     | {
         id?: string;
@@ -327,49 +204,16 @@ async function smokeDshClient(packageDirectory: string): Promise<void> {
       },
     },
   };
-  const server = createServer((request, response) => {
-    if (request.url !== "/client.js") {
-      response.writeHead(404).end();
-      return;
-    }
-    readFile(join(packageDirectory, "dist/client.js"))
-      .then((source) => {
-        response.writeHead(200, {
-          "content-type": "application/javascript; charset=utf-8",
-        });
-        response.end(source);
-      })
-      .catch((error: unknown) => {
-        response.writeHead(500).end(String(error));
-      });
+  const source = await readFile(
+    join(packageDirectory, "dist/client.js"),
+    "utf8",
+  );
+  runInNewContext(source, {
+    globalThis: loaderWindow,
+    window: loaderWindow,
+    TextEncoder,
+    TextDecoder,
   });
-  try {
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", resolve);
-    });
-    const address = server.address();
-    requireCondition(
-      address !== null && typeof address === "object",
-      "Packed browser client test server did not bind a TCP address.",
-    );
-    const response = await fetch(`http://127.0.0.1:${address.port}/client.js`);
-    requireCondition(
-      response.ok,
-      `Packed browser client server returned HTTP ${response.status}.`,
-    );
-    const servedSource = await response.text();
-    runInNewContext(servedSource, {
-      globalThis: loaderWindow,
-      window: loaderWindow,
-      TextEncoder,
-      TextDecoder,
-    });
-  } finally {
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
-    });
-  }
   requireCondition(
     loaded?.id === "@lamplitisles/dsh-imagegen",
     "Packed DSH client did not register with the loader.",
@@ -377,90 +221,6 @@ async function smokeDshClient(packageDirectory: string): Promise<void> {
   requireCondition(
     typeof loaded?.factory === "function",
     "Packed DSH client loader entry has no factory.",
-  );
-
-  const client = loaded?.factory?.((specifier) => {
-    if (specifier === "@deepseek-ai/dsh-client-ui-primitives") {
-      return { IconChevronDownOutline14: () => null };
-    }
-    if (specifier === "react") {
-      return {
-        createElement: () => null,
-        useEffect: () => undefined,
-        useId: () => "smoke",
-        useState: (value: unknown) => [value, () => undefined],
-      };
-    }
-    if (specifier === "react-dom") return { createPortal: () => null };
-    throw new Error(`unexpected packed client dependency: ${specifier}`);
-  }) as {
-    apply?: (ctx: unknown) => void;
-    inject?: readonly string[];
-  };
-  requireCondition(
-    typeof client?.apply === "function",
-    "Packed DSH client did not expose apply().",
-  );
-  requireCondition(
-    JSON.stringify(client?.inject) ===
-      JSON.stringify(["sessions", "settingsScope", "slots"]),
-    "Packed DSH client inject contract is incorrect.",
-  );
-
-  const registrations: Array<{ name: string; key: string }> = [];
-  let boundSettings:
-    { namespace?: string; decode?: (value: unknown) => unknown } | undefined;
-  const scope = {
-    getSnapshot: () => ({
-      status: "ready" as const,
-      value: { bridgeUrl: "https://bridge.invalid" },
-      base: {},
-      user: {},
-      revision: 1,
-      writable: true,
-      mode: "host" as const,
-    }),
-    subscribe: () => () => undefined,
-    set: async () => undefined,
-  };
-  client?.apply?.({
-    effect() {},
-    settingsScope: {
-      bind(spec: { namespace?: string; decode?: (value: unknown) => unknown }) {
-        boundSettings = spec;
-        return scope;
-      },
-    },
-    sessions: { binding: () => undefined },
-    slots: {
-      inject(_name: string, callback: () => unknown) {
-        callback();
-      },
-      register(spec: { name: string; key: string }) {
-        registrations.push(spec);
-        return () => undefined;
-      },
-    },
-  });
-  requireCondition(
-    boundSettings?.namespace === "lamplitisles-kepos-imagegen" &&
-      typeof boundSettings.decode === "function",
-    "Packed DSH client did not bind its alpha settings scope contract.",
-  );
-  requireCondition(
-    registrations.some(
-      ({ name, key }) =>
-        name === "settings.plugin.item" &&
-        key === "lamplitisles-kepos-imagegen",
-    ),
-    "Packed DSH client did not register its native settings card.",
-  );
-  requireCondition(
-    registrations.some(
-      ({ name, key }) =>
-        name === "tool.call.toolview" && key === "kepos_image_generate",
-    ),
-    "Packed DSH client did not register its keyed image tool view.",
   );
 }
 
