@@ -1,23 +1,17 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import {
-  mkdtemp,
-  mkdir,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { Context } from "@deepseek-ai/cordis";
-import Include from "@deepseek-ai/cordis-plugin-include";
-import Loader from "@deepseek-ai/cordis-plugin-loader";
+import { runInNewContext } from "node:vm";
 import { packedManifest, type PackedManifest } from "./release-shared.js";
 
 const root = resolve(import.meta.dirname, "..");
 const temporaryDirectories: string[] = [];
+const dshBin = join(root, "node_modules/.bin/dsh");
+const dshEntry = join(root, "node_modules/@deepseek-ai/dsh/lib/bin.js");
 const DSH_ALPHA_VERSION = "0.1.2-alpha.3";
 const DSH_CLIENT_INJECT = [
   "@deepseek-ai/dsh-api-remotes",
@@ -56,11 +50,17 @@ function requireCondition(
   if (!condition) throw new Error(message);
 }
 
-function run(command: string, args: string[], cwd: string): string {
+function run(
+  command: string,
+  args: string[],
+  cwd: string,
+  options: { env?: NodeJS.ProcessEnv; timeout?: number } = {},
+): string {
   return execFileSync(command, args, {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    ...options,
   });
 }
 
@@ -186,123 +186,130 @@ async function smokeDsh(): Promise<void> {
     "DSH artifact contains an undeclared browser payload.",
   );
 
-  await smokeDshLoader(directory, packageDirectory);
-}
-
-async function smokeDshLoader(
-  directory: string,
-  packageDirectory: string,
-): Promise<void> {
-  const profileDirectory = join(directory, "alpha-profile");
-  await mkdir(profileDirectory, { recursive: true });
-  await symlink(
-    join(root, "packages/dsh-imagegen/node_modules"),
-    join(directory, "node_modules"),
-    "dir",
-  );
-  const configPath = join(profileDirectory, "cordis.yml");
-  await writeFile(
-    configPath,
-    [
-      "- name: '@test/imagegen-services'",
-      "- name: '@lamplitisles/dsh-imagegen'",
-      "",
-    ].join("\n"),
-  );
-
-  const registered: {
-    namespace?: string;
-    schema?: unknown;
-    tool?: { name?: string };
-  } = {};
-  const services = {
-    attachments: {
-      async validateImage() {},
-      async saveImage() {
-        return {
-          attachmentId: "smoke",
-          mediaType: "image/png",
-          bytes: 1,
-          width: 1,
-          height: 1,
-        };
-      },
-    },
-    fs: {},
-    settings: {
-      register(namespace: string, schema: unknown) {
-        registered.namespace = namespace;
-        registered.schema = schema;
-        return { get: () => ({ bridgeUrl: "https://bridge.invalid" }) };
-      },
-    },
-    tools: {
-      register(tool: { name?: string }) {
-        registered.tool = tool;
-      },
-    },
-  };
-  const modules = new Map<string, unknown>([
-    [
-      "@test/imagegen-services",
-      {
-        apply(ctx: Context) {
-          for (const [name, service] of Object.entries(services)) {
-            ctx.provide(name, service);
-          }
-        },
-      },
-    ],
-    [
-      "@lamplitisles/dsh-imagegen",
-      await import(pathToFileURL(join(packageDirectory, "dist/index.js")).href),
-    ],
-  ]);
-
-  const context = new Context();
-  context.baseUrl = `${pathToFileURL(profileDirectory).href}/`;
-  try {
-    await context.plugin(Loader);
-    context.loader.builtins.include = Include;
-    context.loader.internal = {
-      version: "v2",
-      async import(specifier: string) {
-        if (!modules.has(specifier)) {
-          throw new Error(`unexpected Loader import: ${specifier}`);
-        }
-        return modules.get(specifier);
-      },
-    } as unknown as NonNullable<typeof context.loader.internal>;
-    await context.loader.create({
-      name: "cordis:include",
-      config: { path: pathToFileURL(configPath).href },
-    });
-    await context.loader.await();
-    requireCondition(
-      registered.namespace === "lamplitisles-kepos-imagegen",
-      "Alpha Loader did not register the ImageGen settings namespace.",
-    );
-    requireCondition(
-      registered.tool?.name === "kepos_image_generate",
-      "Alpha Loader did not register the ImageGen tool.",
-    );
-  } finally {
-    await context.fiber.dispose();
-  }
-
+  await smokeDshProfile(directory, archive);
   await smokeDshClient(packageDirectory);
 }
 
-async function smokeDshClient(packageDirectory: string): Promise<void> {
-  const clientSource = await readFile(
-    join(packageDirectory, "dist/client.js"),
-    "utf8",
-  );
+async function smokeDshProfile(
+  directory: string,
+  archive: string,
+): Promise<void> {
+  const profile = "alpha-imagegen-smoke";
+  const dshHome = join(directory, "dsh-home");
+  const environment = {
+    ...process.env,
+    DSH_HOME: dshHome,
+    DSH_PERMISSION_MODE: "workspace-write",
+    DSH_TELEMETRY_DISABLED: "1",
+  };
   requireCondition(
-    !clientSource.includes("dsh-client-runtime"),
-    "Packed DSH client still references the retired client Runtime.",
+    run(dshBin, ["--version"], root, { env: environment }).trim() ===
+      DSH_ALPHA_VERSION,
+    `Packed-path smoke must use dsh ${DSH_ALPHA_VERSION}.`,
+  );
+  run(dshBin, ["plugin", "--profile", profile, "add", archive], root, {
+    env: environment,
+  });
+  const profileDirectory = join(dshHome, "profiles", profile);
+  const profileManifest = JSON.parse(
+    await readFile(join(profileDirectory, "package.json"), "utf8"),
+  ) as Record<string, any>;
+  requireCondition(
+    profileManifest.dsh?.profile?.bundles?.includes(
+      "@lamplitisles/dsh-imagegen",
+    ),
+    "dsh plugin add did not activate the ImageGen bundle.",
   );
 
+  const dump = run(dshBin, ["--profile", profile, "--dump-config"], root, {
+    env: environment,
+  });
+  requireCondition(
+    dump.includes("# == @lamplitisles/dsh-imagegen") &&
+      dump.includes("name: '@lamplitisles/dsh-imagegen'") &&
+      dump.includes(
+        "inject:\n    - attachments\n    - fs\n    - settings\n    - tools",
+      ),
+    "dsh --dump-config omitted the ImageGen bundle row or injections.",
+  );
+
+  const marker = join(directory, "host-loader-marker.json");
+  const probe = join(directory, "host-loader-probe.mjs");
+  await writeFile(
+    probe,
+    [
+      'import { writeFileSync } from "node:fs";',
+      'export const inject = ["tools", "appExit"];',
+      "export async function apply(ctx, config) {",
+      "  let tool;",
+      "  for (let attempt = 0; attempt < 100 && tool === undefined; attempt += 1) {",
+      '    tool = ctx.tools.get("kepos_image_generate");',
+      "    if (tool === undefined) await new Promise((resolve) => setTimeout(resolve, 10));",
+      "  }",
+      '  if (tool === undefined) throw new Error("ImageGen tool was not registered");',
+      "  const rendered = tool.output.render({}, {",
+      '    attachment: { attachmentId: "smoke", mediaType: "image/png", bytes: 1, width: 1, height: 1 },',
+      '    path: ".dsh/kepos-imagegen/smoke.png",',
+      '    message: "Generated image saved to .dsh/kepos-imagegen/smoke.png.",',
+      "  });",
+      '  let safeError = "";',
+      "  try {",
+      '    await tool.execute({ prompt: "loader smoke" }, {});',
+      "  } catch (error) {",
+      "    safeError = error instanceof Error ? error.message : String(error);",
+      "  }",
+      '  if (!safeError.includes("active workspace")) throw new Error(`unexpected safe error: ${safeError}`);',
+      "  writeFileSync(config.marker, JSON.stringify({ name: tool.name, rendered, safeError }));",
+      "  ctx.appExit(0);",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  const overlay = join(directory, "host-loader-overlay.yml");
+  await writeFile(
+    overlay,
+    [
+      "- insert:",
+      "    - id: imagegen-host-loader-smoke",
+      '      name: "./host-loader-probe.mjs"',
+      "      inject: [tools, appExit]",
+      "      config:",
+      `        marker: ${JSON.stringify(marker)}`,
+      "",
+    ].join("\n"),
+  );
+  run(
+    process.execPath,
+    ["--expose-internals", dshEntry, "--profile", profile, "--patch", overlay],
+    root,
+    { env: environment, timeout: 30_000 },
+  );
+  const result = JSON.parse(await readFile(marker, "utf8")) as Record<
+    string,
+    any
+  >;
+  requireCondition(
+    result.name === "kepos_image_generate",
+    "The real alpha Loader did not expose the ImageGen Host tool.",
+  );
+  requireCondition(
+    Array.isArray(result.rendered) &&
+      result.rendered.some(
+        (item: Record<string, unknown>) => item.type === "image",
+      ) &&
+      result.rendered.some(
+        (item: Record<string, unknown>) => item.type === "text",
+      ),
+    "The real alpha Loader did not preserve the durable ImageGen result.",
+  );
+  requireCondition(
+    typeof result.safeError === "string" &&
+      result.safeError.includes("active workspace"),
+    "The real alpha Loader did not preserve the safe workspace error.",
+  );
+}
+
+async function smokeDshClient(packageDirectory: string): Promise<void> {
   let loaded:
     | {
         id?: string;
@@ -313,25 +320,55 @@ async function smokeDshClient(packageDirectory: string): Promise<void> {
   type LoaderWindow = {
     __ModuleLoader__: { load(entry: LoaderEntry): void };
   };
-  const globalWithWindow = globalThis as unknown as { window?: LoaderWindow };
-  const previousWindow = globalWithWindow.window;
-  globalWithWindow.window = {
+  const loaderWindow: LoaderWindow = {
     __ModuleLoader__: {
       load(entry: LoaderEntry) {
         loaded = entry;
       },
     },
   };
-  try {
-    await import(
-      `${pathToFileURL(join(packageDirectory, "dist/client.js")).href}?alpha-smoke`
-    );
-  } finally {
-    if (previousWindow === undefined) {
-      delete globalWithWindow.window;
-    } else {
-      globalWithWindow.window = previousWindow;
+  const server = createServer((request, response) => {
+    if (request.url !== "/client.js") {
+      response.writeHead(404).end();
+      return;
     }
+    readFile(join(packageDirectory, "dist/client.js"))
+      .then((source) => {
+        response.writeHead(200, {
+          "content-type": "application/javascript; charset=utf-8",
+        });
+        response.end(source);
+      })
+      .catch((error: unknown) => {
+        response.writeHead(500).end(String(error));
+      });
+  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const address = server.address();
+    requireCondition(
+      address !== null && typeof address === "object",
+      "Packed browser client test server did not bind a TCP address.",
+    );
+    const response = await fetch(`http://127.0.0.1:${address.port}/client.js`);
+    requireCondition(
+      response.ok,
+      `Packed browser client server returned HTTP ${response.status}.`,
+    );
+    const servedSource = await response.text();
+    runInNewContext(servedSource, {
+      globalThis: loaderWindow,
+      window: loaderWindow,
+      TextEncoder,
+      TextDecoder,
+    });
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
   }
   requireCondition(
     loaded?.id === "@lamplitisles/dsh-imagegen",

@@ -117,9 +117,8 @@ function ImageToolCard({ block, sessionId, sessions }: ImageToolCardProps) {
     let objectUrl: string | undefined;
     setSrc(undefined);
     setLoadFailed(false);
-    session
-      .readAttachment(attachment.attachmentId)
-      .then((result: Awaited<ReturnType<ISession["readAttachment"]>>) => {
+    session.readAttachment(attachment.attachmentId).then(
+      (result: Awaited<ReturnType<ISession["readAttachment"]>>) => {
         if (!result.ok || !live) {
           if (live) setLoadFailed(true);
           return;
@@ -130,7 +129,11 @@ function ImageToolCard({ block, sessionId, sessions }: ImageToolCardProps) {
           }),
         );
         setSrc(objectUrl);
-      });
+      },
+      () => {
+        if (live) setLoadFailed(true);
+      },
+    );
     return () => {
       live = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
