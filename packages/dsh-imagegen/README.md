@@ -6,7 +6,7 @@ Install it in a DSH profile:
 dsh plugin --profile <profile> add @lamplitisles/dsh-imagegen
 ```
 
-This package targets the DSH `0.1.2-alpha.5` API contract.
+This package targets the DSH `0.1.2-rc.1` API contract.
 
 Open DSH Settings and use **Kepos Image Generation** to set the bridge address. The
 tool generates when `images` is omitted and edits one through five PNG, JPEG, GIF,

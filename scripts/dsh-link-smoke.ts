@@ -6,12 +6,12 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const root = resolve(import.meta.dirname, "..");
-const version = "0.1.2-alpha.5";
+const version = "0.1.2-rc.1";
 
 function resolveDshCli(): string {
   const dshCli = process.env.DSH_CLI;
   if (!dshCli || !existsSync(dshCli)) {
-    throw new Error("Set DSH_CLI to the fixed local DSH alpha executable.");
+    throw new Error("Set DSH_CLI to the official DSH rc.1 executable.");
   }
   return dshCli;
 }
