@@ -2,7 +2,7 @@
 
 Status: complete
 Date: 2026-09-04
-Implementation commit: pending (the staged rc.1 retarget commit)
+Implementation commit: `ffc6b76` (`feat(dsh-imagegen): retarget DSH contract to rc.1`)
 Amendment fixed point: `55c98a4` (`chore(imagegen): retarget DSH upgrade to rc.1`)
 
 ## Delivered
