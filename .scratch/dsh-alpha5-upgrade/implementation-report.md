@@ -4,6 +4,7 @@ Status: complete
 Date: 2026-09-04
 Implementation commit: `ffc6b76` (`feat(dsh-imagegen): retarget DSH contract to rc.1`)
 Amendment fixed point: `55c98a4` (`chore(imagegen): retarget DSH upgrade to rc.1`)
+Review fix commit: `2184f62` (`fix(dsh-imagegen): document official rc.1 CLI`)
 
 ## Delivered
 
@@ -18,6 +19,14 @@ Amendment fixed point: `55c98a4` (`chore(imagegen): retarget DSH upgrade to rc.1
 - Documented the exact rc.1 contract in the root and DSH package READMEs. The
   repository has no tracked `AGENTS.md`; its agent workflow and conventions did
   not change, so no agent-guidance update was needed.
+
+## Review fix
+
+- Replaced the root README's “fixed development CLI” wording with the official
+  `0.1.2-rc.1` CLI contract. This is documentation-only and does not change
+  plugin behavior.
+- Focused verification passed: `pnpm exec prettier --check README.md` and
+  `git diff --check`.
 
 ## Acceptance and verification
 
