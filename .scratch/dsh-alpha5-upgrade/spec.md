@@ -1,4 +1,8 @@
-Status: complete
+Status: ready-for-agent
+
+## Target Amendment — 0.1.2-rc.1
+
+This amendment supersedes every earlier alpha.5 target in this spec and tickets. Pin the DSH Imagegen direct peer/dev contract, lockfile, scripts, documentation, and disposable smoke to exactly 0.1.2-rc.1. Preserve the Pi package contract and do not add runtime overrides or old-version compatibility.
 
 ## Problem Statement
 
