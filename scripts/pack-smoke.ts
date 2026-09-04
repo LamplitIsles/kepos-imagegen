@@ -9,7 +9,7 @@ import { packedManifest, type PackedManifest } from "./release-shared.js";
 
 const root = resolve(import.meta.dirname, "..");
 const temporaryDirectories: string[] = [];
-const DSH_ALPHA_VERSION = "0.1.2-alpha.3";
+const DSH_ALPHA_VERSION = "0.1.2-alpha.5";
 const DSH_CLIENT_INJECT = [
   "@deepseek-ai/dsh-api-remotes",
   "@deepseek-ai/dsh-api-session-controller",

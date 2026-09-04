@@ -10,6 +10,8 @@ for, stores, or forwards an API key, cookie, token, or other credential.
 dsh plugin --profile <profile> add @lamplitisles/dsh-imagegen
 ```
 
+The DSH package targets the exact `0.1.2-alpha.5` API contract.
+
 Open DSH Settings and select **Kepos Image Generation** to view or change the
 bridge address. The default is `http://codex-bridge.localhost:17480`; the
 adapter appends `/codex/images` itself.

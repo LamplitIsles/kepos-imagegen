@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const root = resolve(import.meta.dirname, "..");
-const version = "0.1.2-alpha.3";
+const version = "0.1.2-alpha.5";
 
 function resolveDshCli(): string {
   const dshCli = process.env.DSH_CLI;
