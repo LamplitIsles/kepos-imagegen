@@ -10,6 +10,8 @@ for, stores, or forwards an API key, cookie, token, or other credential.
 dsh plugin --profile <profile> add @lamplitisles/dsh-imagegen
 ```
 
+The DSH package targets the exact `0.1.2-rc.1` API contract.
+
 Open DSH Settings and select **Kepos Image Generation** to view or change the
 bridge address. The default is `http://codex-bridge.localhost:17480`; the
 adapter appends `/codex/images` itself.
@@ -67,8 +69,8 @@ pnpm test:pack
 These checks use fakes and test-owned temporary directories. They never call a
 live Kepos bridge or publish packages.
 
-To verify the local alpha DSH integration before release, build first and run
-the linked-source smoke against the fixed development CLI. It creates and
+To verify the local rc.1 DSH integration before release, build first and run
+the linked-source smoke against the official `0.1.2-rc.1` CLI. It creates and
 removes its own `DSH_HOME`; it does not start DSH Web or modify the `web`
 profile.
 

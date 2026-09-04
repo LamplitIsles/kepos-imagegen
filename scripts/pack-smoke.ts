@@ -9,7 +9,7 @@ import { packedManifest, type PackedManifest } from "./release-shared.js";
 
 const root = resolve(import.meta.dirname, "..");
 const temporaryDirectories: string[] = [];
-const DSH_ALPHA_VERSION = "0.1.2-alpha.3";
+const DSH_RC_VERSION = "0.1.2-rc.1";
 const DSH_CLIENT_INJECT = [
   "@deepseek-ai/dsh-api-remotes",
   "@deepseek-ai/dsh-api-session-controller",
@@ -130,8 +130,8 @@ async function smokeDsh(): Promise<void> {
   );
   for (const peer of DSH_EXTERNAL_PEERS) {
     requireCondition(
-      manifest.peerDependencies?.[peer] === DSH_ALPHA_VERSION,
-      `DSH peer ${peer} is not pinned to ${DSH_ALPHA_VERSION}.`,
+      manifest.peerDependencies?.[peer] === DSH_RC_VERSION,
+      `DSH peer ${peer} is not pinned to ${DSH_RC_VERSION}.`,
     );
   }
   requireCondition(
@@ -144,8 +144,8 @@ async function smokeDsh(): Promise<void> {
   )) {
     if (dependency.startsWith("@deepseek-ai/dsh-")) {
       requireCondition(
-        version === DSH_ALPHA_VERSION,
-        `DSH development dependency ${dependency} is not pinned to ${DSH_ALPHA_VERSION}.`,
+        version === DSH_RC_VERSION,
+        `DSH development dependency ${dependency} is not pinned to ${DSH_RC_VERSION}.`,
       );
     }
   }
