@@ -70,7 +70,7 @@ These checks use fakes and test-owned temporary directories. They never call a
 live Kepos bridge or publish packages.
 
 To verify the local rc.1 DSH integration before release, build first and run
-the linked-source smoke against the fixed development CLI. It creates and
+the linked-source smoke against the official `0.1.2-rc.1` CLI. It creates and
 removes its own `DSH_HOME`; it does not start DSH Web or modify the `web`
 profile.
 
